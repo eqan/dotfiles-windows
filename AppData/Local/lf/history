@@ -1,0 +1,32 @@
+: delete
+$ :rename lf_scripts
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+: extract_auto
+: extract_auto
+: extract_auto
+: extract_auto
+: extract_auto
+: extract_auto
+: extract_auto_and_remove
+: dragonce
+& python C:/Users/eqana/AppData/Local/lf/lf_scripts/drag.py once %fx%
+: dragonce
+& python C:/Users/eqana/AppData/Local/lf/lf_scripts/drag.py once %fx%
+: delete
+: extract_auto_and_remove
+: extract_auto
+: extract_auto_and_remove
+: touch 1.txr
+: delete
+$ touch 1.txt
+: dragonce
+& python C:/Users/eqana/AppData/Local/lf/lf_scripts/drag.py once %fx%
+: delete
