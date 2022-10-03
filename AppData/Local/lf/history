@@ -30,3 +30,6 @@ $ touch 1.txt
 : dragonce
 & python C:/Users/eqana/AppData/Local/lf/lf_scripts/drag.py once %fx%
 : delete
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%

@@ -1,6 +1,5 @@
 # interpreter for shell commands (needs to be POSIX compatible)
 # Basic Settings
-set shell pwsh
 set preview true
 set previewer "C:\\Users\\eqana\\AppData\\Local\\lf\\lf_scripts\\preview.bat"
 set hidden true
