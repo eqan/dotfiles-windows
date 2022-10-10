@@ -7,7 +7,7 @@ if ($host.Name -eq 'ConsoleHost')
     Import-Module PSReadLine
 }
 #Import-Module PSColors
-#Import-Module posh-git
+Import-Module posh-git
 Import-Module oh-my-posh
 Import-Module -Name Terminal-Icons
 set-alias desktop "Desktop.ps1"
@@ -719,15 +719,15 @@ Set-Alias grep 'C:\ProgramData\chocolatey\bin\grep.exe'
 Set-Alias rprofile '. $profile'
 
 
-Set-PSReadLineOption -EditMode Vi
-Set-PSReadlineOption -ViModeIndicator Script -ViModeChangeHandler {
-    Param($mode)
-    $Env:SHELL_VI_MODE = $mode
-    # go back to the beginning of the line
-    Write-Host -NoNewLine "`e[1000D"
-    # rewrite the prompt manually
-    write-Host -NoNewLine (oh-my-posh --shell pwsh --config "C:\Users\Eqan Ahmad\Documents\PowerShell\ohmyposhv3.json")
-}
+Set-PSReadLineOption -EditMode vi
+#Set-PSReadlineOption -ViModeIndicator Script -ViModeChangeHandler {
+#    Param($mode)
+#    $Env:SHELL_VI_MODE = $mode
+#    # go back to the beginning of the line
+#    Write-Host -NoNewLine "`e[1000D"
+#    # rewrite the prompt manually
+#    write-Host -NoNewLine (oh-my-posh --shell pwsh --config "C:\Users\Eqan Ahmad\Documents\PowerShell\ohmyposhv3.json")
+#}
 
 $LFCD="~/.config/lf/lfcd.ps1"                                #  pre-built binary, make sure to use absolute path
 $LF_ICONS="~/.config/lf/icons.txt"
