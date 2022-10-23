@@ -33,3 +33,22 @@ $ touch 1.txt
 $ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
 $ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
 $ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+: dragonce
+& python C:/Users/eqana/AppData/Local/lf/lf_scripts/drag.py once %fx%
+: rename zenmate
+: rename newsfeederadicator
+: rename
+: dragonce
+& python C:/Users/eqana/AppData/Local/lf/lf_scripts/drag.py once %fx%
+: delete
+: rename
+: renamer
+: rename
+: delete
+: rename Adblocker
+: rename
+: rename Adblocker
+: rename
+: rename
+: delete
+: delete

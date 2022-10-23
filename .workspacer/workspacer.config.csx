@@ -543,6 +543,7 @@ Action<IConfigContext> doConfig = (context) =>
     context.WindowRouter.AddFilter((window) => !window.Title.Contains("Task Scheduler"));
     context.WindowRouter.AddFilter((window) => !window.Title.Contains("Sticky Notes"));
     context.WindowRouter.AddFilter((window) => !window.Title.Contains("Sticky Notes (2)"));
+    context.WindowRouter.AddFilter((window) => !window.Title.Contains("Close sticker edit mode"));
 
     // Keyboard Shortcuts
 
