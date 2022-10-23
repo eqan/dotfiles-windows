@@ -550,6 +550,7 @@ Action<IConfigContext> doConfig = (context) =>
     manager.Subscribe(modKey, workspacer.Keys.Q, () => workspaces.FocusedWorkspace.CloseFocusedWindow());
     manager.Subscribe(modKey, workspacer.Keys.I, () => context.ToggleConsoleWindow(), "toggle debug console");
     manager.Subscribe(modKey, workspacer.Keys.C,() => context.Workspaces.FocusedWorkspace.CloseFocusedWindow(), "close focused window");
+    manager.Subscribe(modKey, workspacer.Keys.Escape,() =>  context.Enabled = !context.Enabled, "toggle enable/disable");
 
 
     // manager.Subscribe(modKey, workspacer.Keys.Q, () => context.Quit());
@@ -562,8 +563,8 @@ Action<IConfigContext> doConfig = (context) =>
     // browserCmd = "/C start chrome";
     // string browsernCmd;
     // browsernCmd = "/C start chrome -incognito";
-    string settingsCmd;
-    settingsCmd = "/C start ms-settings:";
+    // string settingsCmd;
+    // settingsCmd = "/C start ms-settings:";
     // context.Keybinds.Unsubscribe(mod, workspacer.Keys.Q);
     // context.Keybinds.Subscribe(mod, workspacer.Keys.Q, () => context.Workspaces.FocusedWorkspace.CloseFocusedWindow(), "close focused window");
 
@@ -578,6 +579,6 @@ Action<IConfigContext> doConfig = (context) =>
     // Alt + Enter = Alacritty
     // context.Keybinds.Subscribe(mod, workspacer.Keys.Enter, () => System.Diagnostics.Process.Start("alacritty.exe"), "open alacritty");
     // Alt + S = Windows Settings
-    context.Keybinds.Subscribe(modKey, workspacer.Keys.S, () => System.Diagnostics.Process.Start("CMD.exe", settingsCmd), "open windows settings");
+    // context.Keybinds.Subscribe(modKey, workspacer.Keys.S, () => System.Diagnostics.Process.Start("CMD.exe", settingsCmd), "open windows settings");
 };
 return doConfig;
