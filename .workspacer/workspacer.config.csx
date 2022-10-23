@@ -2,26 +2,30 @@
 #r "C:\Program Files\workspacer\plugins\workspacer.Bar\workspacer.Bar.dll"
 #r "C:\Program Files\workspacer\plugins\workspacer.ActionMenu\workspacer.ActionMenu.dll"
 #r "C:\Program Files\workspacer\plugins\workspacer.FocusIndicator\workspacer.FocusIndicator.dll"
+#r "C:\Program Files\workspacer\System.Diagnostics.PerformanceCounter.dll"
+#r "C:\Program Files\workspacer\Microsoft.VisualBasic.Core.dll"
+#r "C:\Program Files\workspacer\Microsoft.VisualBasic.dll"
+#r "C:\Program Files\workspacer\Microsoft.VisualBasic.Forms.dll"
+#r "C:\Program Files\workspacer\plugins\workspacer.Gap\workspacer.Gap.dll"
 
 using System;
 using workspacer;
 using workspacer.Bar;
 using workspacer.ActionMenu;
 using workspacer.FocusIndicator;
-
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using static workspacer.ILayoutEngine;
-using workspacer;
-using workspacer.Bar;
 using workspacer.Bar.Widgets;
-using workspacer.ActionMenu;
-using workspacer.FocusIndicator;
 using System.Diagnostics;
 using System.Timers;
 using System.Windows.Forms;
+using System.Threading;
+using Microsoft.VisualBasic.Devices;
+using workspacer.Gap;
+
 
 // Fibbonaci Spiral Layout "[dwindle]"
 public static class Orientation
@@ -331,7 +335,7 @@ public class BatteryWidget : BarWidgetBase
     public override void Initialize()
     {
         _timer = new System.Timers.Timer(Interval);
-        _timer.Elapsed += (s, e) => Context.MarkDirty();
+        _timer.Elapsed += (s, e) => MarkDirty();
         _timer.Enabled = true;
     }
 }
@@ -392,7 +396,7 @@ public class BetterTitleWidget : BarWidgetBase
         var currentWorkspace = Context.WorkspaceContainer.GetWorkspaceForMonitor(Context.Monitor);
         if (workspace == currentWorkspace)
         {
-            Context.MarkDirty();
+            MarkDirty();
         }
     }
 
@@ -401,13 +405,13 @@ public class BetterTitleWidget : BarWidgetBase
         var currentWorkspace = Context.WorkspaceContainer.GetWorkspaceForMonitor(Context.Monitor);
         if (workspace == currentWorkspace && window == GetWindow())
         {
-            Context.MarkDirty();
+            MarkDirty();
         }
     }
 
     private void RefreshFocusedMonitor()
     {
-        Context.MarkDirty();
+        MarkDirty();
     }
 }
 
@@ -434,25 +438,25 @@ public class FullTimeWidget : BarWidgetBase
     public override void Initialize()
     {
         _timer = new System.Timers.Timer(_interval);
-        _timer.Elapsed += (s, e) => Context.MarkDirty();
+        _timer.Elapsed += (s, e) => MarkDirty();
         _timer.Enabled = true;
     }
 }
 
 Action<IConfigContext> doConfig = (context) =>
 {
-        /* Variables */
+    /* Variables */
     var fontSize = 9;
     var barHeight = 19;
     var fontName = "Consolas";
     var background = new Color(0x0, 0x0, 0x0);
 
     /* Config */
-    // context.CanMinimizeWindows = true;
+    context.CanMinimizeWindows = true;
 
     /* Gap */
-    // var gap = barHeight - 8;
-    // var gapPlugin = context.AddGap(new GapPluginConfig() { InnerGap = gap, OuterGap = gap / 2, Delta = gap / 2 });
+    var gap = barHeight - 8;
+    var gapPlugin = context.AddGap(new GapPluginConfig() { InnerGap = gap, OuterGap = gap / 2, Delta = gap / 2 });
 
     /* Bar */
     context.AddBar(new BarPluginConfig()
@@ -463,10 +467,9 @@ Action<IConfigContext> doConfig = (context) =>
         DefaultWidgetBackground = background,
         LeftWidgets = () => new IBarWidget[]
         {
-            new WorkspaceWidget(), new TextWidget(": "), new TitleWidget() {
+            new WorkspaceWidget(){}, new TextWidget(": "), new TitleWidget(){
                 IsShortTitle = true
-            }
-        },
+            }        },
         RightWidgets = () => new IBarWidget[]
         {
             new BatteryWidget(),
@@ -474,26 +477,6 @@ Action<IConfigContext> doConfig = (context) =>
             new ActiveLayoutWidget(),
         }
     });
-    //  context.AddBar(new BarPluginConfig()
-    // {
-    //     BarTitle = "workspacer.Bar",
-    //     BarHeight = 30,
-    //     FontSize = 12,
-    //     DefaultWidgetForeground = Color.Black,
-    //     DefaultWidgetBackground = Color.White,
-    //     // BarMaxWidth = 1000,
-    //     // BarIsTop = false,
-    
-    //     // LeftWidgets = () => new IBarWidget[] { new WorkspaceWidget() { WorkspaceHasFocusColor = Color.Blue } },
-    //     RightWidgets = () => new IBarWidget[] { }
-    // });
-    // context.AddBar(new BarPluginConfig()
-    // {
-    //     FontName = "Consolas",
-    //     RightWidgets = () => new IBarWidget[] { new FullTimeWidget(), new BatteryWidget() },
-    //     LeftWidgets = () => new IBarWidget[] { new workspacer.Bar.Widgets.WorkspaceWidget(), new workspacer.Bar.Widgets.ActiveLayoutWidget(), new workspacer.Bar.Widgets.TextWidget("-"), new BetterTitleWidget() }
-    // });
-
 
     // Layouts (1) [dwindle] fibonacci (2) [vertical] vertical (3) [tall] list (4) [full] maximize
     context.DefaultLayouts = () => new ILayoutEngine[] { new DwindleLayoutEngine(), new VerticalTiledEngine(), new FullLayoutEngine(), new TallLayoutEngine() };
@@ -533,7 +516,6 @@ Action<IConfigContext> doConfig = (context) =>
     // context.WindowRouter.AddRoute((window) => window.Title.Contains("Discord") ? context.WorkspaceContainer["四"] : null);
     // context.WindowRouter.AddRoute((window) => window.Title.Contains("Messenger") ? context.WorkspaceContainer["三"] : null);
 
-
     // Set workspaces ( 1, 2, 3, 4, 5 )
     context.WorkspaceContainer.CreateWorkspaces("1", "2", "3", "4", "5", "6", "7", "8", "9");
 
@@ -547,7 +529,32 @@ Action<IConfigContext> doConfig = (context) =>
 
     // Keyboard Shortcuts
 
-    // var mod = KeyModifiers.LControl;
+    var modKey = KeyModifiers.Alt;
+    IKeybindManager manager = context.Keybinds;
+    manager.UnsubscribeAll();
+
+    var workspaces = context.Workspaces;
+    
+    manager.Subscribe(modKey, workspacer.Keys.L, () => workspaces.SwitchToNextWorkspace());
+    manager.Subscribe(modKey, workspacer.Keys.H, () => workspaces.SwitchToPreviousWorkspace());
+
+    manager.Subscribe(modKey, workspacer.Keys.J, () => { workspaces.FocusedWorkspace.FocusNextWindow();});
+    manager.Subscribe(modKey, workspacer.Keys.K, () => { workspaces.FocusedWorkspace.FocusPreviousWindow();});
+
+    manager.Subscribe(modKey, workspacer.Keys.Oemcomma,  () => workspaces.FocusedWorkspace.ShrinkPrimaryArea(), "shrink primary area");
+    manager.Subscribe(modKey, workspacer.Keys.OemPeriod, () => workspaces.FocusedWorkspace.ExpandPrimaryArea(), "expand primary area");
+
+    manager.Subscribe(modKey, workspacer.Keys.Space, () => workspaces.FocusedWorkspace.NextLayoutEngine());
+    manager.Subscribe(modKey, workspacer.Keys.Return, () => workspaces.FocusedWorkspace.SwapFocusAndPrimaryWindow(), "make current window primary" );
+
+    manager.Subscribe(modKey, workspacer.Keys.Q, () => workspaces.FocusedWorkspace.CloseFocusedWindow());
+    manager.Subscribe(modKey, workspacer.Keys.I, () => context.ToggleConsoleWindow(), "toggle debug console");
+    manager.Subscribe(modKey, workspacer.Keys.C,() => context.Workspaces.FocusedWorkspace.CloseFocusedWindow(), "close focused window");
+
+
+    // manager.Subscribe(modKey, workspacer.Keys.Q, () => context.Quit());
+    // manager.Subscribe(modShift, workspacer.Keys.Q, () => context.Restart());
+
 
     // string mailCmd;
     // mailCmd = "/C explorer.exe shell:appsFolder\\microsoft.windowscommunicationsapps_8wekyb3d8bbwe!microsoft.windowslive.mail";
@@ -555,8 +562,8 @@ Action<IConfigContext> doConfig = (context) =>
     // browserCmd = "/C start chrome";
     // string browsernCmd;
     // browsernCmd = "/C start chrome -incognito";
-    // string settingsCmd;
-    // settingsCmd = "/C start ms-settings:";
+    string settingsCmd;
+    settingsCmd = "/C start ms-settings:";
     // context.Keybinds.Unsubscribe(mod, workspacer.Keys.Q);
     // context.Keybinds.Subscribe(mod, workspacer.Keys.Q, () => context.Workspaces.FocusedWorkspace.CloseFocusedWindow(), "close focused window");
 
@@ -571,6 +578,6 @@ Action<IConfigContext> doConfig = (context) =>
     // Alt + Enter = Alacritty
     // context.Keybinds.Subscribe(mod, workspacer.Keys.Enter, () => System.Diagnostics.Process.Start("alacritty.exe"), "open alacritty");
     // Alt + S = Windows Settings
-    // context.Keybinds.Subscribe(mod, workspacer.Keys.S, () => System.Diagnostics.Process.Start("CMD.exe", settingsCmd), "open windows settings");
+    context.Keybinds.Subscribe(modKey, workspacer.Keys.S, () => System.Diagnostics.Process.Start("CMD.exe", settingsCmd), "open windows settings");
 };
 return doConfig;
