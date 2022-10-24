@@ -341,79 +341,6 @@ public class BatteryWidget : BarWidgetBase
 }
 
 
-// A Title Widget with character limit on the title
-public class BetterTitleWidget : BarWidgetBase
-{
-    public Color MonitorHasFocusColor { get; set; } = Color.Yellow;
-
-    public static class StringTool
-    {
-        public static string Truncate(string source, int length)
-        {
-            if (source.Length > length)
-            {
-                source = source.Substring(0, length);
-            }
-            return source;
-        }
-    }
-
-    public override IBarWidgetPart[] GetParts()
-    {
-        var window = GetWindow();
-        var isFocusedMonitor = Context.MonitorContainer.FocusedMonitor == Context.Monitor;
-        var multipleMonitors = Context.MonitorContainer.NumMonitors > 1;
-        var color = isFocusedMonitor && multipleMonitors ? MonitorHasFocusColor : null;
-
-        if (window != null)
-        {
-            // Change the number on this line to restrict the amount of characters in the title
-            return Parts(Part(StringTool.Truncate(window.Title, 30), color));
-        } else
-        {
-            return Parts(Part("no windows", color));
-        }
-    }
-
-    public override void Initialize()
-    {
-        Context.Workspaces.WindowAdded += RefreshAddRemove;
-        Context.Workspaces.WindowRemoved += RefreshAddRemove;
-        Context.Workspaces.WindowUpdated += RefreshUpdated;
-        Context.Workspaces.FocusedMonitorUpdated += RefreshFocusedMonitor;
-    }
-
-    private IWindow GetWindow()
-    {
-        var currentWorkspace = Context.WorkspaceContainer.GetWorkspaceForMonitor(Context.Monitor);
-        return currentWorkspace.FocusedWindow ??
-               currentWorkspace.LastFocusedWindow ??
-               currentWorkspace.ManagedWindows.FirstOrDefault();
-    }
-
-    private void RefreshAddRemove(IWindow window, IWorkspace workspace)
-    {
-        var currentWorkspace = Context.WorkspaceContainer.GetWorkspaceForMonitor(Context.Monitor);
-        if (workspace == currentWorkspace)
-        {
-            MarkDirty();
-        }
-    }
-
-    private void RefreshUpdated(IWindow window, IWorkspace workspace)
-    {
-        var currentWorkspace = Context.WorkspaceContainer.GetWorkspaceForMonitor(Context.Monitor);
-        if (workspace == currentWorkspace && window == GetWindow())
-        {
-            MarkDirty();
-        }
-    }
-
-    private void RefreshFocusedMonitor()
-    {
-        MarkDirty();
-    }
-}
 
 // 24-hour Time Widget
 public class FullTimeWidget : BarWidgetBase
@@ -551,6 +478,42 @@ Action<IConfigContext> doConfig = (context) =>
     manager.Subscribe(modKey, workspacer.Keys.I, () => context.ToggleConsoleWindow(), "toggle debug console");
     manager.Subscribe(modKey, workspacer.Keys.C,() => context.Workspaces.FocusedWorkspace.CloseFocusedWindow(), "close focused window");
     manager.Subscribe(modKey, workspacer.Keys.Escape,() =>  context.Enabled = !context.Enabled, "toggle enable/disable");
+
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D1,() => workspaces.MoveFocusedWindowToWorkspace(0), "switch focused window to workspace 1");
+
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D2,() => workspaces.MoveFocusedWindowToWorkspace(1), "switch focused window to workspace 2");
+
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D3,() => workspaces.MoveFocusedWindowToWorkspace(2), "switch focused window to workspace 3");
+
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D4,() => workspaces.MoveFocusedWindowToWorkspace(3), "switch focused window to workspace 4");
+
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D5,() => workspaces.MoveFocusedWindowToWorkspace(4), "switch focused window to workspace 5");
+
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D6,() => workspaces.MoveFocusedWindowToWorkspace(5), "switch focused window to workspace 6");
+
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D7,() => workspaces.MoveFocusedWindowToWorkspace(6), "switch focused window to workspace 7");
+
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D8,() => workspaces.MoveFocusedWindowToWorkspace(7), "switch focused window to workspace 8");
+
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D9,() => workspaces.MoveFocusedWindowToWorkspace(8), "switch focused window to workspace 9");
+
+    manager.Subscribe(modKey, workspacer.Keys.D1,() => workspaces.SwitchToWorkspace(0), "switch to workspace 1");
+
+    manager.Subscribe(modKey, workspacer.Keys.D2,() => workspaces.SwitchToWorkspace(1), "switch to workspace 2");
+
+    manager.Subscribe(modKey, workspacer.Keys.D3,() => workspaces.SwitchToWorkspace(2), "switch to workspace 3");
+
+    manager.Subscribe(modKey, workspacer.Keys.D4,() => workspaces.SwitchToWorkspace(3), "switch to workspace 4");
+
+    manager.Subscribe(modKey, workspacer.Keys.D5,() => workspaces.SwitchToWorkspace(4), "switch to workspace 5");
+
+    manager.Subscribe(modKey, workspacer.Keys.D6,() => workspaces.SwitchToWorkspace(5), "switch to workspace 6");
+
+    manager.Subscribe(modKey, workspacer.Keys.D7,() => workspaces.SwitchToWorkspace(6), "switch to workspace 7");
+
+    manager.Subscribe(modKey, workspacer.Keys.D8,() => workspaces.SwitchToWorkspace(7), "switch to workspace 8");
+
+    manager.Subscribe(modKey, workspacer.Keys.D9,() => workspaces.SwitchToWorkspace(8), "switch to workspace 9");
 
 
     // manager.Subscribe(modKey, workspacer.Keys.Q, () => context.Quit());
