@@ -456,7 +456,7 @@ live_config_reload: true
 #   - (Linux/BSD/macOS) `$SHELL` or the user's login shell, if `$SHELL` is unset
 #   - (Windows) powershell
 shell:
-  program: C:\Program Files\PowerShell\7-preview\pwsh.exe
+  program: C:\Program Files\PowerShell\7\pwsh.exe
 #  args:
 #    - --login
 

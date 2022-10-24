@@ -740,10 +740,10 @@ Set-PSReadLineKeyHandler -Chord Ctrl+o -ScriptBlock {
 
 #region conda initialize
 # !! Contents within this block are managed by 'conda init' !!
-(& "C:\Users\eqana\anaconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
-#endregion
-
-conda config --set changeps1 False
+#(& "C:\Users\eqana\anaconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
+##endregion
+#
+#conda config --set changeps1 False
 
 
 # Import the Chocolatey Profile that contains the necessary code to enable
