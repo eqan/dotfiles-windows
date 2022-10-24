@@ -468,8 +468,8 @@ Action<IConfigContext> doConfig = (context) =>
     manager.Subscribe(modKey, workspacer.Keys.J, () => { workspaces.FocusedWorkspace.FocusNextWindow();});
     manager.Subscribe(modKey, workspacer.Keys.K, () => { workspaces.FocusedWorkspace.FocusPreviousWindow();});
 
-    manager.Subscribe(modKey, workspacer.Keys.Oemcomma,  () => workspaces.FocusedWorkspace.ShrinkPrimaryArea(), "shrink primary area");
-    manager.Subscribe(modKey, workspacer.Keys.OemPeriod, () => workspaces.FocusedWorkspace.ExpandPrimaryArea(), "expand primary area");
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.H,  () => workspaces.FocusedWorkspace.ShrinkPrimaryArea(), "shrink primary area");
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.L, () => workspaces.FocusedWorkspace.ExpandPrimaryArea(), "expand primary area");
 
     manager.Subscribe(modKey, workspacer.Keys.Space, () => workspaces.FocusedWorkspace.NextLayoutEngine());
     manager.Subscribe(modKey, workspacer.Keys.Return, () => workspaces.FocusedWorkspace.SwapFocusAndPrimaryWindow(), "make current window primary" );
@@ -515,6 +515,11 @@ Action<IConfigContext> doConfig = (context) =>
 
     manager.Subscribe(modKey, workspacer.Keys.D9,() => workspaces.SwitchToWorkspace(8), "switch to workspace 9");
 
+    manager.Subscribe(MouseEvent.LButtonDown,() => workspaces.SwitchFocusedMonitorToMouseLocation(), "Switch focused monitor to mouse location");
+
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.Space,() => workspaces.FocusedWorkspace.PreviousLayoutEngine(), "previous layout");
+
+    manager.Subscribe(modKey, workspacer.Keys.N,() => workspaces.FocusedWorkspace.ResetLayout(), "reset layout");
 
     // manager.Subscribe(modKey, workspacer.Keys.Q, () => context.Quit());
     // manager.Subscribe(modShift, workspacer.Keys.Q, () => context.Restart());
