@@ -52,3 +52,7 @@ $ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
 : rename
 : delete
 : delete
+$ python C:/Users/eqana/AppData/Local/lf/lf_scripts/fzfpy.py %id%
+: dragonce
+& python C:/Users/eqana/AppData/Local/lf/lf_scripts/drag.py once %fx%
+: delete

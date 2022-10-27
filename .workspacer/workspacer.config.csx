@@ -454,6 +454,9 @@ Action<IConfigContext> doConfig = (context) =>
     context.WindowRouter.AddFilter((window) => !window.Title.Contains("Sticky Notes (2)"));
     context.WindowRouter.AddFilter((window) => !window.Title.Contains("Close sticker edit mode"));
 
+    // Can minimze
+    //context.canMinimizeWindows = true
+
     // Keyboard Shortcuts
 
     var modKey = KeyModifiers.Alt;
@@ -463,20 +466,27 @@ Action<IConfigContext> doConfig = (context) =>
     var workspaces = context.Workspaces;
     
     manager.Subscribe(modKey, workspacer.Keys.L, () => workspaces.SwitchToNextWorkspace());
+
     manager.Subscribe(modKey, workspacer.Keys.H, () => workspaces.SwitchToPreviousWorkspace());
 
     manager.Subscribe(modKey, workspacer.Keys.J, () => { workspaces.FocusedWorkspace.FocusNextWindow();});
+
     manager.Subscribe(modKey, workspacer.Keys.K, () => { workspaces.FocusedWorkspace.FocusPreviousWindow();});
 
     manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.H,  () => workspaces.FocusedWorkspace.ShrinkPrimaryArea(), "shrink primary area");
+
     manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.L, () => workspaces.FocusedWorkspace.ExpandPrimaryArea(), "expand primary area");
 
     manager.Subscribe(modKey, workspacer.Keys.Space, () => workspaces.FocusedWorkspace.NextLayoutEngine());
+
     manager.Subscribe(modKey, workspacer.Keys.Return, () => workspaces.FocusedWorkspace.SwapFocusAndPrimaryWindow(), "make current window primary" );
 
     manager.Subscribe(modKey, workspacer.Keys.Q, () => workspaces.FocusedWorkspace.CloseFocusedWindow());
+
     manager.Subscribe(modKey, workspacer.Keys.I, () => context.ToggleConsoleWindow(), "toggle debug console");
+
     manager.Subscribe(modKey, workspacer.Keys.C,() => context.Workspaces.FocusedWorkspace.CloseFocusedWindow(), "close focused window");
+
     manager.Subscribe(modKey, workspacer.Keys.Escape,() =>  context.Enabled = !context.Enabled, "toggle enable/disable");
 
     manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D1,() => workspaces.MoveFocusedWindowToWorkspace(0), "switch focused window to workspace 1");
