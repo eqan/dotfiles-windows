@@ -1,0 +1,9 @@
+Development Costs: Building a blockchain platform like NUCES BLOCKED can be expensive and requires a significant amount of funding for development, testing, and deployment.
+
+Marketing and Awareness: To make your platform successful, you need to create awareness about the platform, its benefits, and how it solves the problems in the current education system. This requires marketing and outreach efforts, which can be expensive.
+
+Legal and Compliance: Implementing a blockchain platform for storing academic records and autogenerating degrees requires compliance with local and international regulations. You may need funding to pay for legal fees and regulatory compliance costs.
+
+Data Security: The security of student data is of utmost importance, and you may need to invest in the latest security measures to ensure the platform is secure and trustworthy.
+
+Partnering with Universities and Institutes: To fully realize the potential of NUCES BLOCKED, it's important to partner with universities, colleges, and other educational institutions. Funding can help you negotiate and implement partnerships with these organization

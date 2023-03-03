@@ -1,0 +1,42 @@
+Stat Collection NUCES BLOCKED:
+
+Market size and growth: Provide data on the size of the market you're targeting and the growth rate, which will help investors understand the potential for growth and revenue.
+
+Customer demand: Present statistics that demonstrate a strong demand for your solution and the benefits it provides.
+
+Competitor analysis: Offer insights into the competition, including the size of the market share they hold and the differentiating features of your solution.
+
+User engagement: Share statistics on user engagement, such as the number of active users, the time spent on the platform, and the number of successful degree verifications.
+
+Financial performance: Provide data on revenue and expenses, as well as projections for future growth. This will help investors understand the financial viability of your solution.
+
+Social impact: If your solution has a positive social impact, such as reducing degree fraud or streamlining the degree verification process, share data that supports this impact.
+
+Team: Highlight the experience and qualifications of your team, as well as any relevant partnerships or collaborations.
+
+-------------------------------
+
+Vision 1 is the PNIMA that is the launchpad, there will be next visions as well.
+
+-------------------------------
+
+Slides Color Scheme: Cyan, Blue and white
+
+-------------------------------
+
+1. Problem Anaysis
+2. Competitors and what they bring to the table
+3. Introduction to the project.
+	i. Title
+	ii. Tag line
+	iii. Vision
+4. The process to mitigate the issues
+5. The outcomes of the process
+	i. Tagline
+	ii. Solves X using Y in Z etc || Enable X fullfillment of Y and <Z supply attrition.
+6. Market need for the specific country or on a global level.
+7. What numbers you bring to the table to mitigate the issue.
+8. Team members
+
+--------------------------------
+
