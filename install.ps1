@@ -392,4 +392,21 @@ else {
     Write-Warning "Workspacer installer not found: $workspacerInstaller"
 }
 
+function Test-WindowsActivation {
+    $windowsApplicationId = '55c92734-d682-4d71-983e-d6ec3f16059f'
+    $licensedProduct = Get-CimInstance -ClassName SoftwareLicensingProduct -ErrorAction SilentlyContinue |
+        Where-Object { $_.ApplicationID -eq $windowsApplicationId -and $_.LicenseStatus -eq 1 } |
+        Select-Object -First 1
+
+    if ($licensedProduct) {
+        Write-Host 'Windows activation status: licensed.'
+    }
+    else {
+        Write-Warning 'Windows does not report an active license. Opening Microsoft Activation settings.'
+        Start-Process 'ms-settings:activation'
+    }
+}
+
+Test-WindowsActivation
+
 Write-Host 'Dotfiles bootstrap completed.'
