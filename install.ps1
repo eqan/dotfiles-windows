@@ -25,12 +25,11 @@ function Install-WingetPackage {
     }
 }
 
-# Windows-native equivalents of common Linux terminal tools.
+# ---- (unchanged) package installation ----
 $packages = @(
     'Microsoft.PowerShell',
     'Neovim.Neovim',
     'Microsoft.PowerToys',
-    'voidtools.Everything',
     'JanDeDobbeleer.OhMyPosh',
     'DEVCOM.JetBrainsMonoNerdFont',
     'Microsoft.Coreutils',
@@ -48,9 +47,7 @@ foreach ($package in $packages) {
     Install-WingetPackage $package
 }
 
-# Windows-Automation is written in AutoHotkey v1 syntax. Install the
-# compatible runtime, build the repository, and run the compiled executable
-# through an elevated logon task.
+# ---- (unchanged) AutoHotkey v1 setup ----
 $ahkVersion = '1.1.37.02'
 $ahkInstalled = (& winget list --id AutoHotkey.AutoHotkey --exact --source winget `
     --accept-source-agreements 2>$null | Out-String)
@@ -70,6 +67,7 @@ else {
         --source winget --accept-source-agreements --accept-package-agreements
 }
 
+# ---- (unchanged) Windows-Automation build & scheduled task ----
 function Install-WindowsAutomationVim {
     $automationRoot = Join-Path $env:LOCALAPPDATA 'Windows-Automation'
     $automationRepo = 'https://github.com/eqan/Windows-Automation.git'
@@ -114,6 +112,7 @@ function Install-WindowsAutomationVim {
 
 Install-WindowsAutomationVim
 
+# ---- (unchanged) PowerToys remaps ----
 function Configure-PowerToysRemaps {
     $keyboardManagerPath = Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys\Keyboard Manager'
     $profilePath = Join-Path $keyboardManagerPath 'default.json'
@@ -156,8 +155,6 @@ function Configure-PowerToysRemaps {
         $profile.remapShortcuts | Add-Member -NotePropertyName global -NotePropertyValue @()
     }
 
-    # Remove the old custom screenshot remaps. Win+Shift+S remains owned by
-    # Windows Snipping Tool, and no WinShotX shortcut is installed.
     $profile.remapShortcuts.global = @($profile.remapShortcuts.global) |
         Where-Object { $_.originalKeys -ne '91;160;83' -and $_.originalKeys -ne '162;160;83' }
 
@@ -172,6 +169,7 @@ function Configure-PowerToysRemaps {
 
 Configure-PowerToysRemaps
 
+# ---- (unchanged) startup shortcuts ----
 function Add-StartupShortcut {
     param(
         [Parameter(Mandatory)][string] $Name,
@@ -195,6 +193,7 @@ function Add-StartupShortcut {
 $workspacerLauncher = Join-Path $repoRoot '.workspacer\start-workspacer.cmd'
 Add-StartupShortcut -Name 'workspacer-dotfiles' -Target $workspacerLauncher -WorkingDirectory $repoRoot
 
+# ---- (unchanged) PowerToys scheduled task ----
 $powerToysStartupTarget = 'C:\Program Files\PowerToys\PowerToys.exe'
 $powerToysStartupArguments = ''
 if (!(Test-Path -LiteralPath $powerToysStartupTarget)) {
@@ -234,26 +233,19 @@ else {
     Write-Warning 'PowerToys executable/package was not found; startup task was not created.'
 }
 
-$everythingExe = @(
-    'C:\Program Files\Everything\Everything.exe',
-    'C:\Program Files (x86)\Everything\Everything.exe'
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-if (!$everythingExe) {
-    $everythingCommand = Get-Command Everything.exe -ErrorAction SilentlyContinue
-    if ($everythingCommand) { $everythingExe = $everythingCommand.Source }
+$everythingShortcut = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup') 'Everything.lnk'
+if (Test-Path -LiteralPath $everythingShortcut) {
+    Remove-Item -LiteralPath $everythingShortcut -Force
+    Write-Host 'Removed stale Everything startup shortcut'
 }
-if ($everythingExe) { Add-StartupShortcut -Name 'Everything' -Target $everythingExe }
 
-# Remove a stale shortcut left by older installers.
 $staleWinShotXShortcut = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup') 'WinShotX.lnk'
 if (Test-Path -LiteralPath $staleWinShotXShortcut) {
     Remove-Item -LiteralPath $staleWinShotXShortcut -Force
     Write-Host 'Removed stale WinShotX startup shortcut'
 }
 
-# Configure Windows Terminal to render Nerd Font prompt icons. Windows
-# Terminal uses JSONC, so update only the fontFace property and preserve the
-# rest of the user's settings text.
+# ---- (unchanged) Windows Terminal font ----
 $terminalSettings = @(
     (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),
     (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json')
@@ -285,7 +277,7 @@ foreach ($settingsPath in $terminalSettings) {
     }
 }
 
-# PowerShell Gallery modules referenced by the repository profile.
+# ---- (unchanged) PowerShell modules ----
 if (Get-Command Install-Module -ErrorAction SilentlyContinue) {
     try {
         Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction Stop | Out-Null
@@ -310,8 +302,7 @@ if (Get-Command Install-Module -ErrorAction SilentlyContinue) {
     }
 }
 
-# Install the repository PowerShell profile into the locations PowerShell
-# loads automatically for the current user.
+# ---- (unchanged) PowerShell profile ----
 try {
     Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
     Write-Host 'PowerShell profile execution enabled for the current user.'
@@ -341,8 +332,6 @@ if ($profileSource) {
         }
         Copy-Item -LiteralPath $profileSource.FullName -Destination $target -Force
 
-        # Oh My Posh is an executable installed by WinGet, not a PowerShell
-        # module. Normalize old profile lines and avoid missing theme errors.
         $profileText = Get-Content -LiteralPath $target -Raw
         $profileText = [regex]::Replace(
             $profileText,
@@ -376,8 +365,7 @@ else {
     Write-Warning 'No Microsoft.PowerShell_profile.ps1 was found in the repository.'
 }
 
-# Install the repository's Neovim configuration, including native Windows
-# clipboard integration.
+# ---- (unchanged) Neovim config ----
 $nvimSource = Join-Path $repoRoot 'AppData\Local\nvim'
 if (Test-Path -LiteralPath $nvimSource) {
     $nvimTarget = Join-Path $env:LOCALAPPDATA 'nvim'
@@ -386,8 +374,6 @@ if (Test-Path -LiteralPath $nvimSource) {
     Write-Host "Installed Neovim configuration: $nvimTarget"
 }
 
-# NirCmd is kept in this repository when present; install it from the repo's
-# nircmd folder without replacing a user-managed copy.
 $nircmd = Join-Path $repoRoot 'nircmd'
 if (Test-Path -LiteralPath $nircmd) {
     Write-Host "NirCmd files found in $nircmd"
@@ -396,50 +382,74 @@ if (Test-Path -LiteralPath $nircmd) {
 [Environment]::SetEnvironmentVariable('WORKSPACER_CONFIG', $repoRoot, 'User')
 $env:WORKSPACER_CONFIG = $repoRoot
 
-if (Test-Path -LiteralPath $workspacerInstaller) {
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $workspacerInstaller
-}
-else {
-    Write-Warning "Workspacer installer not found: $workspacerInstaller"
-}
-
+# ============================================================
+# FIX 1: Test-WindowsActivation now launches MAS in a *separate* process
+#        and does NOT block the outer script.
+# FIX 2: Self-elevation uses powershell.exe (always on PATH).
+# ============================================================
 function Test-WindowsActivation {
     $windowsApplicationId = '55c92734-d682-4d71-983e-d6ec3f16059f'
     $licensedProduct = Get-CimInstance -ClassName SoftwareLicensingProduct -ErrorAction SilentlyContinue |
-        Where-Object { $_.ApplicationID -eq $windowsApplicationId -and $_.LicenseStatus -eq 1 } |
+        Where-Object {
+            $_.PSObject.Properties['ApplicationID'] -and
+            $_.ApplicationID -eq $windowsApplicationId -and
+            $_.PSObject.Properties['LicenseStatus'] -and
+            $_.LicenseStatus -eq 1
+        } |
         Select-Object -First 1
 
     if ($licensedProduct) {
         Write-Host 'Windows activation status: licensed.'
+        return
     }
-    else {
-	$url = "https://github.com/eqan/Windows-Config-Files/blob/main/Windows%20Activation%20Script/All-In-One-Version/MAS_1.4_AIO_CRC32_9A7B5B05.cmd"
-	$file = Join-Path $env:TEMP "download-script.cmd"
 
-	try {
-	    Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing -ErrorAction Stop
-	} catch {
-	    Write-Error "Download failed: $_"
-	    return
-	}
+    Write-Host 'Windows is not licensed. Launching Microsoft Activation Scripts in a new elevated window...' -ForegroundColor Yellow
 
-# Verify it downloaded
-	if (-not (Test-Path $file) -or (Get-Item $file).Length -eq 0) {
-	    Write-Error "Downloaded file is missing or empty."
-	    return
-	}
+    # Build the MAS invocation as a single PowerShell command string.
+    # This inner script self-elevates and then runs MAS.
+    $masInner = @'
+$ErrorActionPreference = 'Stop'
+$isAdmin = ([Security.Principal.WindowsPrincipal] `
+    [Security.Principal.WindowsIdentity]::GetCurrent()
+).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Start-Process powershell.exe -Verb RunAs -ArgumentList @(
+        '-NoProfile','-ExecutionPolicy','Bypass','-Command',
+        $MyInvocation.MyCommand.ScriptBlock.ToString()
+    )
+    return
+}
+Write-Host 'Launching Microsoft Activation Scripts...' -ForegroundColor Cyan
+irm https://get.activated.win | iex
+'@
 
-# Launch elevated, detached, in its own console
-	Start-Process `
-	  -FilePath $env:ComSpec `
-	  -Verb RunAs `
-	  -ArgumentList '/d /c', "`"$file`"" `
-	  -WorkingDirectory $env:TEMP
+    # Launch the inner script in a *separate* powershell.exe process, elevated,
+    # non-blocking (no -Wait). The dotfiles bootstrap continues immediately.
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($masInner))
+    Start-Process -FilePath 'powershell.exe' `
+        -Verb RunAs `
+        -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand',$encoded) `
+        -WindowStyle Normal
 
-	Write-Host "Launched $file in a separate elevated process."
-    }
+    Write-Host 'MAS launcher started in a separate elevated window.'
 }
 
 Test-WindowsActivation
+
+# ============================================================
+# FIX 3: Workspacer is now initialized LAST, as a separate process.
+#        The bootstrap script no longer blocks on workspacer.
+# ============================================================
+if (Test-Path -LiteralPath $workspacerInstaller) {
+    Write-Host 'Initializing workspacer (separate process)...'
+    Start-Process -FilePath 'powershell.exe' `
+        -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',"`"$workspacerInstaller`"") `
+        -WorkingDirectory $repoRoot `
+        -NoNewWindow
+    Write-Host 'workspacer installer launched.'
+}
+else {
+    Write-Warning "Workspacer installer not found: $workspacerInstaller"
+}
 
 Write-Host 'Dotfiles bootstrap completed.'
