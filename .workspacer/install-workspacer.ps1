@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$launcher = Join-Path $PSScriptRoot 'start-workspacer-task.cmd'
+$launcher = Join-Path $PSScriptRoot 'start-workspacer-hidden.vbs'
 $exe = 'C:\Program Files\workspacer\workspacer.exe'
 
 $installed = (& winget list --id rickbutton.workspacer --exact --source winget `
@@ -26,8 +26,8 @@ if (Test-Path -LiteralPath $startup) {
 
 $taskName = 'Workspacer (elevated)'
 $userId = "$env:USERDOMAIN\$env:USERNAME"
-$taskAction = New-ScheduledTaskAction -Execute $env:ComSpec `
-    -Argument "/d /c `"$launcher`"" `
+$taskAction = New-ScheduledTaskAction -Execute (Join-Path $env:WINDIR 'System32\wscript.exe') `
+    -Argument "`"$launcher`"" `
     -WorkingDirectory $repoRoot
 $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
 $taskPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Highest
