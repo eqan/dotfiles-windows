@@ -27,6 +27,22 @@ $shortcut.WorkingDirectory = $repoRoot
 $shortcut.Description = 'Start Workspacer from the dotfiles repository'
 $shortcut.Save()
 
-Get-Process workspacer -ErrorAction SilentlyContinue | Stop-Process -Force
-Start-Process -FilePath $launcher -WorkingDirectory $repoRoot
+$repair = 'C:\Users\eqan\.workspacer\repair-workspacer-dotfiles.ps1'
+if (Test-Path -LiteralPath $repair) {
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File $repair
+}
+
+try {
+    $running = Get-Process workspacer -ErrorAction SilentlyContinue
+    if ($running) {
+        Stop-Process -InputObject $running -Force -ErrorAction Stop
+    }
+}
+catch {
+    Write-Warning "Could not restart the existing Workspacer process. Close it from the tray or press Alt+Shift+Q, then run setup again."
+}
+
+if (!(Get-Process workspacer -ErrorAction SilentlyContinue)) {
+    Start-Process -FilePath $launcher -WorkingDirectory $repoRoot
+}
 Write-Host 'Workspacer setup complete.'
