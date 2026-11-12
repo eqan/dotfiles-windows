@@ -193,10 +193,13 @@ function Add-StartupShortcut {
 $workspacerLauncher = Join-Path $repoRoot '.workspacer\start-workspacer.cmd'
 Add-StartupShortcut -Name 'workspacer-dotfiles' -Target $workspacerLauncher -WorkingDirectory $repoRoot
 
-# ---- (unchanged) PowerToys scheduled task ----
-$powerToysStartupTarget = 'C:\Program Files\PowerToys\PowerToys.exe'
+# ---- PowerToys elevated startup task ----
+$powerToysStartupTarget = @(
+    'C:\Program Files\PowerToys\PowerToys.exe',
+    (Join-Path $env:LOCALAPPDATA 'PowerToys\PowerToys.exe')
+) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 $powerToysStartupArguments = ''
-if (!(Test-Path -LiteralPath $powerToysStartupTarget)) {
+if (!$powerToysStartupTarget) {
     $powerToysCommand = Get-Command PowerToys.exe -ErrorAction SilentlyContinue
     if ($powerToysCommand) {
         $powerToysStartupTarget = $powerToysCommand.Source
