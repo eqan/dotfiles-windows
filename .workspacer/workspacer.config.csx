@@ -437,6 +437,8 @@ Action<IConfigContext> doConfig = (context) =>
     // ignore WinShotX overlay
     context.WindowRouter.AddFilter((window) => !window.ProcessName.ToLower().Contains("winshotx"));
     // Replace any built-in Alt+C assignment with one close action
+    // Replace any built-in Alt+C assignment with one close action
+    // Replace any built-in Alt+C assignment with one close action
     // PowerToys Run owns Alt+Space
     context.Keybinds.Unsubscribe(KeyModifiers.Alt, workspacer.Keys.Space);
     // Replace any built-in Alt+C assignment with one close action
@@ -445,6 +447,8 @@ Action<IConfigContext> doConfig = (context) =>
 };
 
 return doConfig;
+
+
 
 
 
