@@ -4,9 +4,16 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $launcher = Join-Path $repoRoot '.workspacer\start-workspacer.cmd'
 $exe = 'C:\Program Files\workspacer\workspacer.exe'
 
-Write-Host 'Installing Workspacer with WinGet...'
-winget install --id rickbutton.workspacer --exact --source winget `
-    --accept-source-agreements --accept-package-agreements
+$installed = (& winget list --id rickbutton.workspacer --exact --source winget `
+    --accept-source-agreements 2>$null | Out-String)
+if ($installed -match 'rickbutton\.workspacer') {
+    Write-Host 'Skipping Workspacer (already installed).'
+}
+else {
+    Write-Host 'Installing Workspacer with WinGet...'
+    winget install --id rickbutton.workspacer --exact --source winget `
+        --accept-source-agreements --accept-package-agreements
+}
 
 if (!(Test-Path -LiteralPath $exe)) {
     throw "Workspacer was not found at $exe after installation. Restart PowerShell and run this script again."
