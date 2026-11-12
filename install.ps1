@@ -47,6 +47,66 @@ foreach ($package in $packages) {
     Install-WingetPackage $package
 }
 
+# Windows-Automation is written in AutoHotkey v1 syntax. Install the
+# compatible runtime, build the repository, and run the compiled executable
+# through an elevated logon task.
+$ahkVersion = '1.1.37.02'
+$ahkInstalled = (& winget list --id AutoHotkey.AutoHotkey --exact --source winget `
+    --accept-source-agreements 2>$null | Out-String)
+if ($ahkInstalled -match 'AutoHotkey') {
+    if ($ahkInstalled -match [regex]::Escape($ahkVersion)) {
+        Write-Host "Skipping AutoHotkey.AutoHotkey $ahkVersion (already installed)."
+    }
+    else {
+        Write-Host 'Replacing incompatible AutoHotkey version with v1.1.37.02...'
+        & winget uninstall --id AutoHotkey.AutoHotkey --exact --silent
+        & winget install --id AutoHotkey.AutoHotkey --exact --version $ahkVersion `
+            --source winget --accept-source-agreements --accept-package-agreements
+    }
+}
+else {
+    & winget install --id AutoHotkey.AutoHotkey --exact --version $ahkVersion `
+        --source winget --accept-source-agreements --accept-package-agreements
+}
+
+function Install-WindowsAutomationVim {
+    $automationRoot = Join-Path $env:LOCALAPPDATA 'Windows-Automation'
+    $automationRepo = 'https://github.com/eqan/Windows-Automation.git'
+    $buildScript = Join-Path $automationRoot 'build.bat'
+
+    if (!(Test-Path -LiteralPath (Join-Path $automationRoot '.git'))) {
+        if (Test-Path -LiteralPath $automationRoot) {
+            Remove-Item -LiteralPath $automationRoot -Recurse -Force
+        }
+        git clone --depth 1 $automationRepo $automationRoot
+        if ($LASTEXITCODE -ne 0) { throw 'Could not clone Windows-Automation.' }
+    }
+    else {
+        git -C $automationRoot pull --ff-only
+        if ($LASTEXITCODE -ne 0) { Write-Warning 'Could not update Windows-Automation; using its current files.' }
+    }
+
+    if (!(Test-Path -LiteralPath $buildScript)) { throw "Windows-Automation build script not found: $buildScript" }
+    & cmd.exe /d /c "`"$buildScript`""
+    if ($LASTEXITCODE -ne 0) { throw "Windows-Automation build failed with exit code $LASTEXITCODE." }
+
+    $vimExe = Get-ChildItem -LiteralPath $automationRoot -Recurse -File `
+        -Filter 'vim_ahk.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (!$vimExe) { throw 'Windows-Automation build completed without producing vim_ahk.exe.' }
+
+    $taskName = 'AutoHotkey Vim (Windows-Automation)'
+    $userId = "$env:USERDOMAIN\$env:USERNAME"
+    $taskAction = New-ScheduledTaskAction -Execute $vimExe.FullName -WorkingDirectory $vimExe.DirectoryName
+    $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+    $taskPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType InteractiveToken -RunLevel Highest
+    $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    Register-ScheduledTask -TaskName $taskName -Action $taskAction -Trigger $taskTrigger -Principal $taskPrincipal -Settings $taskSettings -Force | Out-Null
+    Start-ScheduledTask -TaskName $taskName
+    Write-Host 'Configured elevated startup: AutoHotkey Vim (Windows-Automation)'
+}
+
+Install-WindowsAutomationVim
+
 function Configure-PowerToysRemaps {
     $keyboardManagerPath = Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys\Keyboard Manager'
     $profilePath = Join-Path $keyboardManagerPath 'default.json'
