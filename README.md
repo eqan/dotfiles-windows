@@ -17,6 +17,9 @@ The installer:
 - Sets `WORKSPACER_CONFIG` to this repository
 - Installs PowerShell 7
 - Installs Microsoft PowerToys for keyboard remapping
+- Installs Artifex's MuPDF toolkit (`mutool`), VLC, 7-Zip, and Zen Browser
+- Includes an optional Chris Titus Tech WinUtil Minimal debloat step; the current
+  machine is marked as already debloated so rerunning setup does not repeat it
 - Installs AutoHotkey v1.1.37.02 for the repository's Vim AHK configuration
 - Installs Oh My Posh and the `posh-git`, `Terminal-Icons`, and `PSReadLine` PowerShell dependencies
 - Installs JetBrainsMono Nerd Font for prompt icons and configures Windows Terminal to use it
@@ -40,6 +43,19 @@ Useful shortcuts include `Alt+C` to close the focused window and the standard Wo
 The installer backs up and updates Windows Terminal's `settings.json` to use **JetBrainsMono Nerd Font**. Restart Windows Terminal after setup so the font change takes effect.
 
 PowerToys Run is the Windows Search replacement. Press `Alt+Space` to launch it, then search for applications, files, settings, and commands.
+
+## Debloating and default applications
+
+The installer uses the official [Chris Titus Tech Windows Utility](https://christitus.com/windows-tool)
+headlessly with its `Minimal` preset only when `$windowsAlreadyDebloated` in
+`install.ps1` is set to `$false`. It is currently `$true` because this system has
+already been debloated. WinUtil requires an elevated PowerShell session.
+
+WinGet installs VLC, 7-Zip, Zen Browser, and Artifex's MuPDF command-line toolkit
+(`mutool`). Windows protects the current user's default-app associations; therefore
+the installer does not overwrite them through unsupported registry hacks. Set VLC,
+Zen Browser, and your preferred PDF handler in **Settings → Apps → Default apps**
+after installation.
 
 ## Vim AHK
 

@@ -25,11 +25,41 @@ function Install-WingetPackage {
     }
 }
 
-# ---- (unchanged) package installation ----
+# Keep this true on machines that have already had the Windows cleanup applied.
+# Set it to $false on a fresh installation to run Chris Titus Tech's Minimal preset.
+$windowsAlreadyDebloated = $true
+
+function Invoke-ChrisTitusMinimalDebloat {
+    if ($windowsAlreadyDebloated) {
+        Write-Host 'Skipping Chris Titus Tech Minimal debloat (windowsAlreadyDebloated = $true).'
+        return
+    }
+
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+    if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        throw 'Chris Titus Tech Minimal debloat requires an Administrator PowerShell session.'
+    }
+
+    Write-Host 'Applying Chris Titus Tech WinUtil Minimal preset...'
+    $winUtil = Invoke-RestMethod 'https://christitus.com/win'
+    & ([ScriptBlock]::Create($winUtil)) -Preset Minimal
+    if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+        throw "Chris Titus Tech WinUtil Minimal preset failed with exit code $LASTEXITCODE."
+    }
+}
+
+Invoke-ChrisTitusMinimalDebloat
+
+# ---- package installation ----
 $packages = @(
     'Microsoft.PowerShell',
     'Neovim.Neovim',
     'Microsoft.PowerToys',
+    'ArtifexSoftware.mutool',
+    'VideoLAN.VLC',
+    '7zip.7zip',
+    'Zen-Team.Zen-Browser',
     'JanDeDobbeleer.OhMyPosh',
     'DEVCOM.JetBrainsMonoNerdFont',
     'Microsoft.Coreutils',
