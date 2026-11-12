@@ -249,6 +249,52 @@ Set-Alias lf 'C:\Users\eqana\go\bin\lf.exe'
 Set-Alias grep 'C:\ProgramData\chocolatey\bin\grep.exe'
 Set-Alias rprofile '. $profile'
 
+function global:refresh-vim-ahk {
+    [CmdletBinding()]
+    param([switch]$NoPull)
+
+    $automationRoot = Join-Path $env:LOCALAPPDATA 'Windows-Automation'
+    $taskName = 'AutoHotkey Vim (Windows-Automation)'
+    $buildScript = Join-Path $automationRoot 'build.bat'
+
+    if (!(Test-Path -LiteralPath $buildScript)) {
+        throw "Windows-Automation was not found at $automationRoot. Run the dotfiles installer first."
+    }
+
+    $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    if ($task) {
+        Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 500
+    }
+
+    Get-Process -Name vim_ahk -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+    if (!$NoPull -and (Get-Command git -ErrorAction SilentlyContinue)) {
+        git -C $automationRoot pull --ff-only
+        if ($LASTEXITCODE -ne 0) { throw 'Windows-Automation could not be updated with git pull.' }
+    }
+
+    Push-Location $automationRoot
+    try {
+        & cmd.exe /d /c '.\build.bat'
+        if ($LASTEXITCODE -ne 0) { throw "Windows-Automation build failed with exit code $LASTEXITCODE." }
+    }
+    finally {
+        Pop-Location
+    }
+
+    if ($task) {
+        Start-ScheduledTask -TaskName $taskName
+        Write-Host 'Vim AHK rebuilt and restarted through the elevated scheduled task.' -ForegroundColor Green
+    }
+    else {
+        $vimExe = Join-Path $automationRoot 'vim_ahk\vim_ahk.exe'
+        Start-Process -FilePath $vimExe -WorkingDirectory (Split-Path -Parent $vimExe)
+        Write-Warning 'The elevated Vim AHK scheduled task was not found; started the executable normally.'
+    }
+}
+Set-Alias -Name vim-refresh -Value refresh-vim-ahk -Scope Global
+
 function global:which ([string]$command) {
   if (-not($command)) { throw "ERROR: Please supply a command name" }
   (Get-Command $command).Path
