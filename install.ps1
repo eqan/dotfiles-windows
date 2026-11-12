@@ -28,6 +28,7 @@ function Install-WingetPackage {
 # Windows-native equivalents of common Linux terminal tools.
 $packages = @(
     'Microsoft.PowerShell',
+    'Neovim.Neovim',
     'Microsoft.PowerToys',
     'voidtools.Everything',
     'JanDeDobbeleer.OhMyPosh',
