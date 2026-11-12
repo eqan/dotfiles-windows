@@ -1,4 +1,4 @@
-#r "C:\Program Files\workspacer\workspacer.Shared.dll"
+﻿#r "C:\Program Files\workspacer\workspacer.Shared.dll"
 #r "C:\Program Files\workspacer\plugins\workspacer.Bar\workspacer.Bar.dll"
 #r "C:\Program Files\workspacer\plugins\workspacer.ActionMenu\workspacer.ActionMenu.dll"
 #r "C:\Program Files\workspacer\plugins\workspacer.FocusIndicator\workspacer.FocusIndicator.dll"
@@ -25,7 +25,6 @@ using System.Windows.Forms;
 using System.Threading;
 using Microsoft.VisualBasic.Devices;
 using workspacer.Gap;
-
 
 // Fibbonaci Spiral Layout "[dwindle]"
 public static class Orientation
@@ -54,7 +53,6 @@ public class DwindleLayoutEngine : ILayoutEngine
 
     public string Name => "dwindle";
 
-
     public IEnumerable<IWindowLocation> CalcLayout(IEnumerable<IWindow> windows, int spaceWidth, int spaceHeight)
     {
         var list = new List<IWindowLocation>();
@@ -69,9 +67,6 @@ public class DwindleLayoutEngine : ILayoutEngine
         int primaryHeight = spaceHeight / numInPrimary;
         int height = spaceHeight / Math.Max(numWindows - numInPrimary, 1);
 
-        // if there are more "primary" windows than actual windows,
-        // then we want the pane to actually spread the entire width
-        // of the working area
         if (numInPrimary >= numWindows)
         {
             primaryWidth = spaceWidth;
@@ -79,7 +74,6 @@ public class DwindleLayoutEngine : ILayoutEngine
 
         int secondaryWidth = spaceWidth - primaryWidth;
 
-        // Recurse in a 'dwindle fibonacci' pattern
         bool curOrientation = Orientation.Vertical;
         int curWidth = secondaryWidth;
         int curTop = 0;
@@ -109,7 +103,12 @@ public class DwindleLayoutEngine : ILayoutEngine
                     curOrientation = Orientation.Vertical;
                 }
             }
-        }        return list;    }    public void ShrinkPrimaryArea()    {        _primaryPercentOffset -= _primaryPercentIncrement;    }    public void ExpandPrimaryArea()    {        _primaryPercentOffset += _primaryPercentIncrement;    }
+        }
+        return list;
+    }
+    
+    public void ShrinkPrimaryArea() { _primaryPercentOffset -= _primaryPercentIncrement; }
+    public void ExpandPrimaryArea() { _primaryPercentOffset += _primaryPercentIncrement; }
 
     public void ResetPrimaryArea()
     {
@@ -134,7 +133,6 @@ public class DwindleLayoutEngine : ILayoutEngine
         return _numInPrimary + _numInPrimaryOffset;
     }
 }
-
 
 // A Tiling Layout for vertical monitors
 public class VerticalTiledEngine : ILayoutEngine
@@ -252,38 +250,16 @@ public class VerticalTiledEngine : ILayoutEngine
         return locationList;
     }
 
-    public void ShrinkPrimaryArea()
-    {
-        _primaryPercentOffset -= _primaryPercentIncrement;
-    }
-
-    public void ExpandPrimaryArea()
-    {
-        _primaryPercentOffset += _primaryPercentIncrement;
-    }
-
-    public void ResetPrimaryArea()
-    {
-        _primaryPercentOffset = 0;
-    }
-
-    public void IncrementNumInPrimary()
-    {
-        _numInPrimaryOffset++;
-    }
-
+    public void ShrinkPrimaryArea() { _primaryPercentOffset -= _primaryPercentIncrement; }
+    public void ExpandPrimaryArea() { _primaryPercentOffset += _primaryPercentIncrement; }
+    public void ResetPrimaryArea() { _primaryPercentOffset = 0; }
+    public void IncrementNumInPrimary() { _numInPrimaryOffset++; }
     public void DecrementNumInPrimary()
     {
-        if (GetNumInPrimary() > 1)
-        {
-            _numInPrimaryOffset--;
-        }
+        if (GetNumInPrimary() > 1) { _numInPrimaryOffset--; }
     }
 
-    private int GetNumInPrimary()
-    {
-        return _numInPrimary + _numInPrimaryOffset;
-    }
+    private int GetNumInPrimary() { return _numInPrimary + _numInPrimaryOffset; }
 
     private class LayoutLocation
     {
@@ -296,9 +272,9 @@ public class VerticalTiledEngine : ILayoutEngine
 // A Battery Widget with multiple steps of displaying battery percentage
 public class BatteryWidget : BarWidgetBase
 {
-    public Color LowChargeColor { get; set; } = Color.Red;
-    public Color MedChargeColor { get; set; } = Color.Yellow;
-    public Color HighChargeColor { get; set; } = Color.Green;
+    public workspacer.Color LowChargeColor { get; set; } = workspacer.Color.Red;
+    public workspacer.Color MedChargeColor { get; set; } = workspacer.Color.Yellow;
+    public workspacer.Color HighChargeColor { get; set; } = workspacer.Color.Green;
     public bool HasBatteryWarning { get; set; } = true;
     public double LowChargeThreshold { get; set; } = 0.10;
     public double MedChargeThreshold { get; set; } = 0.50;
@@ -314,17 +290,11 @@ public class BatteryWidget : BarWidgetBase
         if (HasBatteryWarning)
         {
             if (currentBatteryCharge <= LowChargeThreshold)
-            {
                 return Parts(Part(currentBatteryCharge.ToString(" #0%"), LowChargeColor));
-            }
             else if (currentBatteryCharge <= MedChargeThreshold)
-            {
                 return Parts(Part(currentBatteryCharge.ToString(" #0%"), MedChargeColor));
-            }
             else
-            {
                 return Parts(Part(currentBatteryCharge.ToString(" #0%"), HighChargeColor));
-            }
         }
         else
         {
@@ -339,8 +309,6 @@ public class BatteryWidget : BarWidgetBase
         _timer.Enabled = true;
     }
 }
-
-
 
 // 24-hour Time Widget
 public class FullTimeWidget : BarWidgetBase
@@ -376,7 +344,7 @@ Action<IConfigContext> doConfig = (context) =>
     var fontSize = 9;
     var barHeight = 19;
     var fontName = "Consolas";
-    var background = new Color(0x0, 0x0, 0x0);
+    var background = new workspacer.Color(0, 0, 0);
 
     /* Config */
     context.CanMinimizeWindows = true;
@@ -392,41 +360,31 @@ Action<IConfigContext> doConfig = (context) =>
         BarHeight = barHeight,
         FontName = fontName,
         DefaultWidgetBackground = background,
+        Background = background,
+        DefaultWidgetForeground = new workspacer.Color(220, 220, 220),
         LeftWidgets = () => new IBarWidget[]
         {
-            new WorkspaceWidget(){}, new TextWidget(": "), new TitleWidget(){
-                IsShortTitle = true
-            }        },
+            new WorkspaceWidget(){}, new TextWidget(": "), new TitleWidget(){ IsShortTitle = true }
+        },
         RightWidgets = () => new IBarWidget[]
         {
-            new BatteryWidget(),
-            new TimeWidget(1000, "HH:mm:ss dd-MMM-yyyy"),
-            new ActiveLayoutWidget(),
-        }
+            new FocusedMonitorWidget(), new ActiveLayoutWidget(), new BatteryWidget(), new FullTimeWidget(1000, "HH:mm:ss dd-MMM-yyyy"),
+            }
     });
 
-    // Layouts (1) [dwindle] fibonacci (2) [vertical] vertical (3) [tall] list (4) [full] maximize
+    // Layouts
     context.DefaultLayouts = () => new ILayoutEngine[] { new DwindleLayoutEngine(), new VerticalTiledEngine(), new FullLayoutEngine(), new TallLayoutEngine() };
 
     context.AddFocusIndicator();
 
-    // Add "log off" menu to action menu (Alt + P)
+    // Action Menu
     var actionMenu = context.AddActionMenu();
-
     var subMenu = actionMenu.Create();
 
-    // Sleep
-    string sleepCmd;
-    sleepCmd = "/C rundll32.exe powrprof.dll,SetSuspendState 0,1,0";
-    // Lock Desktop
-    string lockCmd;
-    lockCmd = "/C rundll32.exe user32.dll,LockWorkStation";
-    // Shutdown
-    string shutdownCmd;
-    shutdownCmd = "/C shutdown /s /t 0";
-    // Restart
-    string restartCmd;
-    restartCmd = "/C shutdown /r /t 0";
+    string sleepCmd = "/C rundll32.exe powrprof.dll,SetSuspendState 0,1,0";
+    string lockCmd = "/C rundll32.exe user32.dll,LockWorkStation";
+    string shutdownCmd = "/C shutdown /s /t 0";
+    string restartCmd = "/C shutdown /r /t 0";
 
     subMenu.Add("sleep", () => System.Diagnostics.Process.Start("CMD.exe", sleepCmd));
     subMenu.Add("lock desktop", () => System.Diagnostics.Process.Start("CMD.exe", lockCmd));
@@ -435,18 +393,10 @@ Action<IConfigContext> doConfig = (context) =>
 
     actionMenu.DefaultMenu.AddMenu("log off", subMenu);
 
-    // Exclude Applications from being managed by workspacer (games & forced fullscreen apps)
+    // Filters and Routing
     context.WindowRouter.AddFilter((window) => !window.Title.Contains("Snip"));
-
-    // Set certain Applications to a specific workspace
-    // context.WindowRouter.AddRoute((window) => window.Title.Contains("Spotify") ? context.WorkspaceContainer["五"] : null);
-    // context.WindowRouter.AddRoute((window) => window.Title.Contains("Discord") ? context.WorkspaceContainer["四"] : null);
-    // context.WindowRouter.AddRoute((window) => window.Title.Contains("Messenger") ? context.WorkspaceContainer["三"] : null);
-
-    // Set workspaces ( 1, 2, 3, 4, 5 )
     context.WorkspaceContainer.CreateWorkspaces("1", "2", "3", "4", "5", "6", "7", "8", "9");
 
-    // Ignore Windows
     context.WindowRouter.AddFilter((window) => !window.Title.Contains("Search"));
     context.WindowRouter.AddFilter((window) => !window.Title.Contains("Services"));
     context.WindowRouter.AddFilter((window) => !window.Title.Contains("Task Scheduler"));
@@ -454,11 +404,7 @@ Action<IConfigContext> doConfig = (context) =>
     context.WindowRouter.AddFilter((window) => !window.Title.Contains("Sticky Notes (2)"));
     context.WindowRouter.AddFilter((window) => !window.Title.Contains("Close sticker edit mode"));
 
-    // Can minimze
-    //context.canMinimizeWindows = true
-
-    // Keyboard Shortcuts
-
+    // Keybindings
     var modKey = KeyModifiers.Alt;
     IKeybindManager manager = context.Keybinds;
     manager.UnsubscribeAll();
@@ -466,97 +412,41 @@ Action<IConfigContext> doConfig = (context) =>
     var workspaces = context.Workspaces;
     
     manager.Subscribe(modKey, workspacer.Keys.L, () => workspaces.SwitchToNextWorkspace());
-
     manager.Subscribe(modKey, workspacer.Keys.H, () => workspaces.SwitchToPreviousWorkspace());
-
-    manager.Subscribe(modKey, workspacer.Keys.J, () => { workspaces.FocusedWorkspace.FocusNextWindow();});
-
-    manager.Subscribe(modKey, workspacer.Keys.K, () => { workspaces.FocusedWorkspace.FocusPreviousWindow();});
-
-    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.H,  () => workspaces.FocusedWorkspace.ShrinkPrimaryArea(), "shrink primary area");
-
+    manager.Subscribe(modKey, workspacer.Keys.J, () => { workspaces.FocusedWorkspace.FocusNextWindow(); });
+    manager.Subscribe(modKey, workspacer.Keys.K, () => { workspaces.FocusedWorkspace.FocusPreviousWindow(); });
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.H, () => workspaces.FocusedWorkspace.ShrinkPrimaryArea(), "shrink primary area");
     manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.L, () => workspaces.FocusedWorkspace.ExpandPrimaryArea(), "expand primary area");
-
     manager.Subscribe(modKey, workspacer.Keys.Space, () => workspaces.FocusedWorkspace.NextLayoutEngine());
-
-    manager.Subscribe(modKey, workspacer.Keys.Return, () => workspaces.FocusedWorkspace.SwapFocusAndPrimaryWindow(), "make current window primary" );
-
+    manager.Subscribe(modKey, workspacer.Keys.Return, () => workspaces.FocusedWorkspace.SwapFocusAndPrimaryWindow(), "make current window primary");
     manager.Subscribe(modKey, workspacer.Keys.Q, () => workspaces.FocusedWorkspace.CloseFocusedWindow());
-
     manager.Subscribe(modKey, workspacer.Keys.I, () => context.ToggleConsoleWindow(), "toggle debug console");
+    manager.Subscribe(modKey, workspacer.Keys.C, () => context.Workspaces.FocusedWorkspace.CloseFocusedWindow(), "close focused window");
+    manager.Subscribe(modKey, workspacer.Keys.Escape, () => context.Enabled = !context.Enabled, "toggle enable/disable");
 
-    manager.Subscribe(modKey, workspacer.Keys.C,() => context.Workspaces.FocusedWorkspace.CloseFocusedWindow(), "close focused window");
+    for (int i = 0; i < 9; i++)
+    {
+        var workspaceIndex = i;
+        var key = (workspacer.Keys)((int)workspacer.Keys.D1 + i);
+        manager.Subscribe(modKey | KeyModifiers.LShift, key, () => workspaces.MoveFocusedWindowToWorkspace(workspaceIndex), $"switch focused window to workspace {i + 1}");
+        manager.Subscribe(modKey, key, () => workspaces.SwitchToWorkspace(workspaceIndex), $"switch to workspace {i + 1}");
+    }
 
-    manager.Subscribe(modKey, workspacer.Keys.Escape,() =>  context.Enabled = !context.Enabled, "toggle enable/disable");
-
-    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D1,() => workspaces.MoveFocusedWindowToWorkspace(0), "switch focused window to workspace 1");
-
-    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D2,() => workspaces.MoveFocusedWindowToWorkspace(1), "switch focused window to workspace 2");
-
-    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D3,() => workspaces.MoveFocusedWindowToWorkspace(2), "switch focused window to workspace 3");
-
-    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D4,() => workspaces.MoveFocusedWindowToWorkspace(3), "switch focused window to workspace 4");
-
-    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D5,() => workspaces.MoveFocusedWindowToWorkspace(4), "switch focused window to workspace 5");
-
-    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D6,() => workspaces.MoveFocusedWindowToWorkspace(5), "switch focused window to workspace 6");
-
-    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D7,() => workspaces.MoveFocusedWindowToWorkspace(6), "switch focused window to workspace 7");
-
-    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D8,() => workspaces.MoveFocusedWindowToWorkspace(7), "switch focused window to workspace 8");
-
-    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.D9,() => workspaces.MoveFocusedWindowToWorkspace(8), "switch focused window to workspace 9");
-
-    manager.Subscribe(modKey, workspacer.Keys.D1,() => workspaces.SwitchToWorkspace(0), "switch to workspace 1");
-
-    manager.Subscribe(modKey, workspacer.Keys.D2,() => workspaces.SwitchToWorkspace(1), "switch to workspace 2");
-
-    manager.Subscribe(modKey, workspacer.Keys.D3,() => workspaces.SwitchToWorkspace(2), "switch to workspace 3");
-
-    manager.Subscribe(modKey, workspacer.Keys.D4,() => workspaces.SwitchToWorkspace(3), "switch to workspace 4");
-
-    manager.Subscribe(modKey, workspacer.Keys.D5,() => workspaces.SwitchToWorkspace(4), "switch to workspace 5");
-
-    manager.Subscribe(modKey, workspacer.Keys.D6,() => workspaces.SwitchToWorkspace(5), "switch to workspace 6");
-
-    manager.Subscribe(modKey, workspacer.Keys.D7,() => workspaces.SwitchToWorkspace(6), "switch to workspace 7");
-
-    manager.Subscribe(modKey, workspacer.Keys.D8,() => workspaces.SwitchToWorkspace(7), "switch to workspace 8");
-
-    manager.Subscribe(modKey, workspacer.Keys.D9,() => workspaces.SwitchToWorkspace(8), "switch to workspace 9");
-
-    manager.Subscribe(MouseEvent.LButtonDown,() => workspaces.SwitchFocusedMonitorToMouseLocation(), "Switch focused monitor to mouse location");
-
-    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.Space,() => workspaces.FocusedWorkspace.PreviousLayoutEngine(), "previous layout");
-
-    manager.Subscribe(modKey, workspacer.Keys.N,() => workspaces.FocusedWorkspace.ResetLayout(), "reset layout");
-
-    // manager.Subscribe(modKey, workspacer.Keys.Q, () => context.Quit());
-    // manager.Subscribe(modShift, workspacer.Keys.Q, () => context.Restart());
-
-
-    // string mailCmd;
-    // mailCmd = "/C explorer.exe shell:appsFolder\\microsoft.windowscommunicationsapps_8wekyb3d8bbwe!microsoft.windowslive.mail";
-    // string browserCmd;
-    // browserCmd = "/C start chrome";
-    // string browsernCmd;
-    // browsernCmd = "/C start chrome -incognito";
-    // string settingsCmd;
-    // settingsCmd = "/C start ms-settings:";
-    // context.Keybinds.Unsubscribe(mod, workspacer.Keys.Q);
-    // context.Keybinds.Subscribe(mod, workspacer.Keys.Q, () => context.Workspaces.FocusedWorkspace.CloseFocusedWindow(), "close focused window");
-
-    // Alt + F = File Explorer
-    // context.Keybinds.Subscribe(mod, workspacer.Keys.F, () => System.Diagnostics.Process.Start("explorer.exe"), "open file explorer");
-    // Alt + B = Chrome
-    // context.Keybinds.Subscribe(mod, workspacer.Keys.B, () => System.Diagnostics.Process.Start("CMD.exe", browserCmd), "open chrome");
-    // Alt + N = Chrome (Incognito)
-    // context.Keybinds.Subscribe(mod, workspacer.Keys.N, () => System.Diagnostics.Process.Start("CMD.exe", browsernCmd), "open chrome (incognito)");
-    // Alt + M = Windows Mail
-    // context.Keybinds.Subscribe(mod, workspacer.Keys.M, () => System.Diagnostics.Process.Start("CMD.exe", mailCmd), "open windows mail");
-    // Alt + Enter = Alacritty
-    // context.Keybinds.Subscribe(mod, workspacer.Keys.Enter, () => System.Diagnostics.Process.Start("alacritty.exe"), "open alacritty");
-    // Alt + S = Windows Settings
-    // context.Keybinds.Subscribe(modKey, workspacer.Keys.S, () => System.Diagnostics.Process.Start("CMD.exe", settingsCmd), "open windows settings");
+    manager.Subscribe(MouseEvent.LButtonDown, () => workspaces.SwitchFocusedMonitorToMouseLocation(), "Switch focused monitor to mouse location");
+    manager.Subscribe(modKey | KeyModifiers.LShift, workspacer.Keys.Space, () => workspaces.FocusedWorkspace.PreviousLayoutEngine(), "previous layout");
+    manager.Subscribe(modKey, workspacer.Keys.N, () => workspaces.FocusedWorkspace.ResetLayout(), "reset layout");
 };
+
 return doConfig;
+
+
+
+
+
+
+
+
+
+
+
+
