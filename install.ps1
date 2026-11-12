@@ -416,13 +416,27 @@ function Test-WindowsActivation {
 	$url = "https://github.com/eqan/Windows-Config-Files/blob/main/Windows%20Activation%20Script/All-In-One-Version/MAS_1.4_AIO_CRC32_9A7B5B05.cmd"
 	$file = Join-Path $env:TEMP "download-script.cmd"
 
-	Invoke-WebRequest -Uri $url -OutFile $file
+	try {
+	    Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing -ErrorAction Stop
+	} catch {
+	    Write-Error "Download failed: $_"
+	    return
+	}
 
+# Verify it downloaded
+	if (-not (Test-Path $file) -or (Get-Item $file).Length -eq 0) {
+	    Write-Error "Downloaded file is missing or empty."
+	    return
+	}
+
+# Launch elevated, detached, in its own console
 	Start-Process `
 	  -FilePath $env:ComSpec `
 	  -Verb RunAs `
-	  -ArgumentList "/d /c `"$file`"" `
-	  -Wait
+	  -ArgumentList '/d /c', "`"$file`"" `
+	  -WorkingDirectory $env:TEMP
+
+	Write-Host "Launched $file in a separate elevated process."
     }
 }
 
