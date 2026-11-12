@@ -104,7 +104,7 @@ function Install-WindowsAutomationVim {
     $userId = "$env:USERDOMAIN\$env:USERNAME"
     $taskAction = New-ScheduledTaskAction -Execute $vimExe.FullName -WorkingDirectory $vimExe.DirectoryName
     $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
-    $taskPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType InteractiveToken -RunLevel Highest
+    $taskPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Highest
     $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
     Register-ScheduledTask -TaskName $taskName -Action $taskAction -Trigger $taskTrigger -Principal $taskPrincipal -Settings $taskSettings -Force | Out-Null
     Start-ScheduledTask -TaskName $taskName
