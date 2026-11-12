@@ -20,6 +20,8 @@ The installer:
 - Installs Artifex's MuPDF toolkit (`mutool`), VLC, 7-Zip, and Zen Browser
 - Includes an optional Chris Titus Tech WinUtil Minimal debloat step; the current
   machine is marked as already debloated so rerunning setup does not repeat it
+- Configures WinUtil-style Security updates only: feature updates are deferred,
+  driver delivery through Windows Update is disabled, and updates notify before install
 - Installs AutoHotkey v1.1.37.02 for the repository's Vim AHK configuration
 - Installs Oh My Posh and the `posh-git`, `Terminal-Icons`, and `PSReadLine` PowerShell dependencies
 - Installs JetBrainsMono Nerd Font for prompt icons and configures Windows Terminal to use it
@@ -49,7 +51,13 @@ PowerToys Run is the Windows Search replacement. Press `Alt+Space` to launch it,
 The installer uses the official [Chris Titus Tech Windows Utility](https://christitus.com/windows-tool)
 headlessly with its `Minimal` preset only when `$windowsAlreadyDebloated` in
 `install.ps1` is set to `$false`. It is currently `$true` because this system has
-already been debloated. WinUtil requires an elevated PowerShell session.
+already been debloated. The Minimal preset includes WinUtil's essential telemetry
+protection and service/privacy settings. WinUtil requires an elevated PowerShell session.
+
+The installer also applies WinUtil's documented **Security** Windows Update workflow:
+feature updates are deferred for 365 days, quality updates for 4 days, driver delivery
+through Windows Update is disabled, and Windows notifies before installation. Windows
+Update remains enabled so security updates can still arrive.
 
 WinGet installs VLC, 7-Zip, Zen Browser, and Artifex's MuPDF command-line toolkit
 (`mutool`). Windows protects the current user's default-app associations; therefore

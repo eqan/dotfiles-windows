@@ -51,6 +51,40 @@ function Invoke-ChrisTitusMinimalDebloat {
 
 Invoke-ChrisTitusMinimalDebloat
 
+function Set-SecurityOnlyWindowsUpdates {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+    if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        throw 'Security-only Windows Update configuration requires an Administrator PowerShell session.'
+    }
+
+    # Mirrors WinUtil's documented Updates > Security workflow:
+    # https://github.com/ChrisTitusTech/winutil/blob/main/functions/public/Invoke-WPFUpdatessecurity.ps1
+    $updatePolicyPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
+    $automaticUpdatePolicyPath = Join-Path $updatePolicyPath 'AU'
+    $driverPolicyPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching'
+
+    New-Item -Path $driverPolicyPath -Force | Out-Null
+    Set-ItemProperty -Path $driverPolicyPath -Name DontPromptForWindowsUpdate -Type DWord -Value 1
+    Set-ItemProperty -Path $driverPolicyPath -Name DontSearchWindowsUpdate -Type DWord -Value 1
+    Set-ItemProperty -Path $driverPolicyPath -Name DriverUpdateWizardWuSearchEnabled -Type DWord -Value 0
+
+    New-Item -Path $updatePolicyPath -Force | Out-Null
+    Set-ItemProperty -Path $updatePolicyPath -Name ExcludeWUDriversInQualityUpdate -Type DWord -Value 1
+    Set-ItemProperty -Path $updatePolicyPath -Name DeferFeatureUpdates -Type DWord -Value 1
+    Set-ItemProperty -Path $updatePolicyPath -Name DeferFeatureUpdatesPeriodInDays -Type DWord -Value 365
+    Set-ItemProperty -Path $updatePolicyPath -Name DeferQualityUpdates -Type DWord -Value 1
+    Set-ItemProperty -Path $updatePolicyPath -Name DeferQualityUpdatesPeriodInDays -Type DWord -Value 4
+
+    New-Item -Path $automaticUpdatePolicyPath -Force | Out-Null
+    Remove-ItemProperty -Path $automaticUpdatePolicyPath -Name NoAutoRebootWithLoggedOnUsers -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path $automaticUpdatePolicyPath -Name AUOptions -Type DWord -Value 3
+    Set-ItemProperty -Path $automaticUpdatePolicyPath -Name AUPowerManagement -Type DWord -Value 0
+    Write-Host 'Configured WinUtil-style security-only Windows Update settings.'
+}
+
+Set-SecurityOnlyWindowsUpdates
+
 # ---- package installation ----
 $packages = @(
     'Microsoft.PowerShell',
