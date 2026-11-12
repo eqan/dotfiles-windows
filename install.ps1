@@ -194,12 +194,44 @@ function Add-StartupShortcut {
 $workspacerLauncher = Join-Path $repoRoot '.workspacer\start-workspacer.cmd'
 Add-StartupShortcut -Name 'workspacer-dotfiles' -Target $workspacerLauncher -WorkingDirectory $repoRoot
 
-$powerToysExe = 'C:\Program Files\PowerToys\PowerToys.exe'
-if (!(Test-Path -LiteralPath $powerToysExe)) {
+$powerToysStartupTarget = 'C:\Program Files\PowerToys\PowerToys.exe'
+$powerToysStartupArguments = ''
+if (!(Test-Path -LiteralPath $powerToysStartupTarget)) {
     $powerToysCommand = Get-Command PowerToys.exe -ErrorAction SilentlyContinue
-    if ($powerToysCommand) { $powerToysExe = $powerToysCommand.Source }
+    if ($powerToysCommand) {
+        $powerToysStartupTarget = $powerToysCommand.Source
+    }
+    else {
+        $powerToysPackage = Get-AppxPackage -Name Microsoft.PowerToys -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($powerToysPackage) {
+            $packagedExe = Get-ChildItem -LiteralPath $powerToysPackage.InstallLocation -Recurse -Filter 'PowerToys.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($packagedExe) {
+                $powerToysStartupTarget = $packagedExe.FullName
+            }
+            else {
+                $powerToysStartupTarget = Join-Path $env:WINDIR 'explorer.exe'
+                $powerToysStartupArguments = "shell:AppsFolder\$($powerToysPackage.PackageFamilyName)!PowerToys"
+            }
+        }
+    }
 }
-Add-StartupShortcut -Name 'PowerToys' -Target $powerToysExe
+
+$powerToysShortcut = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup') 'PowerToys.lnk'
+if (Test-Path -LiteralPath $powerToysShortcut) { Remove-Item -LiteralPath $powerToysShortcut -Force }
+if (Test-Path -LiteralPath $powerToysStartupTarget) {
+    $powerToysTaskName = 'PowerToys (elevated)'
+    $userId = "$env:USERDOMAIN\$env:USERNAME"
+    $taskAction = New-ScheduledTaskAction -Execute $powerToysStartupTarget -Argument $powerToysStartupArguments -WorkingDirectory (Split-Path -Parent $powerToysStartupTarget)
+    $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+    $taskPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Highest
+    $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    Register-ScheduledTask -TaskName $powerToysTaskName -Action $taskAction -Trigger $taskTrigger -Principal $taskPrincipal -Settings $taskSettings -Force | Out-Null
+    if (!(Get-Process PowerToys -ErrorAction SilentlyContinue)) { Start-ScheduledTask -TaskName $powerToysTaskName }
+    Write-Host 'Configured elevated startup: PowerToys'
+}
+else {
+    Write-Warning 'PowerToys executable/package was not found; startup task was not created.'
+}
 
 $everythingExe = @(
     'C:\Program Files\Everything\Everything.exe',
