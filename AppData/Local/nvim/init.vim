@@ -5,12 +5,19 @@ set number relativenumber
 imap [] <Esc>
 imap kj <Esc>
 nmap R <c-n>:%s///g<left><left>
-" WSL yank support
-let s:clip = 'C:\Windows\System32\clip.exe'  " change this path according to your mount point
-if executable(s:clip)
-    augroup WSLYank
-        autocmd!
-        autocmd TextYankPost * if v:event.operator ==# 'y' | call system(s:clip, @0) | endif
-    augroup END
-endif
+" Native Windows clipboard integration.
+" clip.exe handles copy; PowerShell provides raw text for paste.
+let g:clipboard = {
+      \ 'name': 'windows-clipboard',
+      \ 'copy': {
+      \   '+': ['clip.exe'],
+      \   '*': ['clip.exe'],
+      \ },
+      \ 'paste': {
+      \   '+': ['powershell.exe', '-NoProfile', '-Command', '[Console]::Out.Write((Get-Clipboard -Raw))'],
+      \   '*': ['powershell.exe', '-NoProfile', '-Command', '[Console]::Out.Write((Get-Clipboard -Raw))'],
+      \ },
+      \ 'cache_enabled': 0,
+      \ }
+set clipboard=unnamedplus
 nnoremap <C-w> <Cmd>call VSCodeNotify('workbench.action.closeActiveEditor')<CR>
