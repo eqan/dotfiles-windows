@@ -87,8 +87,14 @@ function Install-WindowsAutomationVim {
     }
 
     if (!(Test-Path -LiteralPath $buildScript)) { throw "Windows-Automation build script not found: $buildScript" }
-    & cmd.exe /d /c "`"$buildScript`""
-    if ($LASTEXITCODE -ne 0) { throw "Windows-Automation build failed with exit code $LASTEXITCODE." }
+    Push-Location $automationRoot
+    try {
+        & cmd.exe /d /c '.\build.bat'
+        if ($LASTEXITCODE -ne 0) { throw "Windows-Automation build failed with exit code $LASTEXITCODE." }
+    }
+    finally {
+        Pop-Location
+    }
 
     $vimExe = Get-ChildItem -LiteralPath $automationRoot -Recurse -File `
         -Filter 'vim_ahk.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
