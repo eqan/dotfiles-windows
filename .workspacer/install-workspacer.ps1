@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$launcher = Join-Path $repoRoot '.workspacer\start-workspacer.cmd'
+$launcher = Join-Path $PSScriptRoot 'start-workspacer-task.cmd'
 $exe = 'C:\Program Files\workspacer\workspacer.exe'
 
 $installed = (& winget list --id rickbutton.workspacer --exact --source winget `
@@ -20,12 +20,20 @@ if (!(Test-Path -LiteralPath $exe)) {
 }
 
 $startup = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup\workspacer-dotfiles.lnk'
-$shell = New-Object -ComObject WScript.Shell
-$shortcut = $shell.CreateShortcut($startup)
-$shortcut.TargetPath = $launcher
-$shortcut.WorkingDirectory = $repoRoot
-$shortcut.Description = 'Start Workspacer from the dotfiles repository'
-$shortcut.Save()
+if (Test-Path -LiteralPath $startup) {
+    Remove-Item -LiteralPath $startup -Force
+}
+
+$taskName = 'Workspacer (elevated)'
+$userId = "$env:USERDOMAIN\$env:USERNAME"
+$taskAction = New-ScheduledTaskAction -Execute $env:ComSpec `
+    -Argument "/d /c `"$launcher`"" `
+    -WorkingDirectory $repoRoot
+$taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+$taskPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Highest
+$taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+Register-ScheduledTask -TaskName $taskName -Action $taskAction -Trigger $taskTrigger `
+    -Principal $taskPrincipal -Settings $taskSettings -Force | Out-Null
 
 $repair = 'C:\Users\eqan\.workspacer\repair-workspacer-dotfiles.ps1'
 if (Test-Path -LiteralPath $repair) {
@@ -43,6 +51,6 @@ catch {
 }
 
 if (!(Get-Process workspacer -ErrorAction SilentlyContinue)) {
-    Start-Process -FilePath $launcher -WorkingDirectory $repoRoot
+    Start-ScheduledTask -TaskName $taskName
 }
-Write-Host 'Workspacer setup complete.'
+Write-Host 'Configured elevated startup: Workspacer'

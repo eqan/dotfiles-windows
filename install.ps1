@@ -233,29 +233,11 @@ function Configure-PowerToysRemaps {
 
 Configure-PowerToysRemaps
 
-# ---- (unchanged) startup shortcuts ----
-function Add-StartupShortcut {
-    param(
-        [Parameter(Mandatory)][string] $Name,
-        [Parameter(Mandatory)][string] $Target,
-        [string] $Arguments = '',
-        [string] $WorkingDirectory = ''
-    )
-
-    if (!(Test-Path -LiteralPath $Target)) { return }
-    $startupDirectory = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'
-    $shortcutPath = Join-Path $startupDirectory "$Name.lnk"
-    $shell = New-Object -ComObject WScript.Shell
-    $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $Target
-    $shortcut.Arguments = $Arguments
-    $shortcut.WorkingDirectory = if ($WorkingDirectory) { $WorkingDirectory } else { Split-Path -Parent $Target }
-    $shortcut.Save()
-    Write-Host "Configured startup: $Name"
+# ---- Workspacer startup is registered as an elevated scheduled task ----
+$workspacerStartupShortcut = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup') 'workspacer-dotfiles.lnk'
+if (Test-Path -LiteralPath $workspacerStartupShortcut) {
+    Remove-Item -LiteralPath $workspacerStartupShortcut -Force
 }
-
-$workspacerLauncher = Join-Path $repoRoot '.workspacer\start-workspacer.cmd'
-Add-StartupShortcut -Name 'workspacer-dotfiles' -Target $workspacerLauncher -WorkingDirectory $repoRoot
 
 # ---- PowerToys elevated startup task ----
 $powerToysStartupTarget = @(

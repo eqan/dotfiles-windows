@@ -30,7 +30,7 @@ The installer:
 - Detects the repository's `nircmd` files
 - Installs Workspacer with WinGet (`rickbutton.workspacer`)
 - Builds `vim_ahk.exe` from `eqan/Windows-Automation`
-- Registers Workspacer and Vim AHK as elevated startup tasks
+- Registers Workspacer and Vim AHK as elevated startup tasks with highest privileges
 - Uses this repository as the Workspacer configuration root
 - Starts Workspacer and Vim AHK with the committed configuration
 
