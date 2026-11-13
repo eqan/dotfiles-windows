@@ -22,6 +22,8 @@ The installer:
   machine is marked as already debloated so rerunning setup does not repeat it
 - Configures WinUtil-style Security updates only: feature updates are deferred,
   driver delivery through Windows Update is disabled, and updates notify before install
+- At the start, optionally enables battery C-state-friendly power settings: processor
+  idle and core parking, 5% minimum battery processor state, and maximum PCIe ASPM
 - Installs AutoHotkey v1.1.37.02 for the repository's Vim AHK configuration
 - Installs Oh My Posh and the `posh-git`, `Terminal-Icons`, and `PSReadLine` PowerShell dependencies
 - Installs JetBrainsMono Nerd Font for prompt icons and configures Windows Terminal to use it
@@ -58,6 +60,15 @@ The installer also applies WinUtil's documented **Security** Windows Update work
 feature updates are deferred for 365 days, quality updates for 4 days, driver delivery
 through Windows Update is disabled, and Windows notifies before installation. Windows
 Update remains enabled so security updates can still arrive.
+
+### Battery C-state optimization
+
+The bootstrap asks whether to apply the optional battery optimization near startup.
+Answer `y` or `yes` to configure the active power plan with processor idle enabled,
+core parking allowed, a 5% minimum processor state on battery, and maximum PCIe
+link-state power savings. Answering anything else skips it. These settings allow
+deeper idle states but cannot force a particular C-state; CPU firmware, drivers, and
+active devices determine the final residency.
 
 WinGet installs VLC, 7-Zip, Zen Browser, and Artifex's MuPDF command-line toolkit
 (`mutool`). Windows protects the current user's default-app associations; therefore

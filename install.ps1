@@ -7,6 +7,53 @@ if (!(Get-Command winget -ErrorAction SilentlyContinue)) {
     throw 'WinGet is unavailable. Install/update App Installer from Microsoft Store, then run this script again.'
 }
 
+function Enable-BatteryCStateOptimization {
+    Write-Host ''
+    Write-Host 'Optional battery / CPU idle optimization' -ForegroundColor Cyan
+    Write-Host 'This enables Windows settings that allow deeper processor idle states:'
+    Write-Host '  - processor idle enabled and core parking allowed'
+    Write-Host '  - 5% minimum processor state on battery'
+    Write-Host '  - maximum PCIe link-state power savings on battery'
+    Write-Host 'Firmware and the CPU still control the actual C-state residency.'
+
+    $answer = Read-Host 'Apply these battery C-state-friendly settings now? [y/N]'
+    if ($answer -notmatch '^(?i:y|yes)$') {
+        Write-Host 'Skipping battery / CPU idle optimization.'
+        return
+    }
+
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+    if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        throw 'Battery C-state optimization requires an Administrator PowerShell session.'
+    }
+
+    $settings = @(
+        @{ Subgroup = 'SUB_PROCESSOR'; Setting = 'IDLEDISABLE'; Value = 0 },
+        @{ Subgroup = 'SUB_PROCESSOR'; Setting = 'IDLEDEMOTE'; Value = 40 },
+        @{ Subgroup = 'SUB_PROCESSOR'; Setting = 'IDLEPROMOTE'; Value = 20 },
+        @{ Subgroup = 'SUB_PROCESSOR'; Setting = 'PROCTHROTTLEMIN'; Value = 5 },
+        @{ Subgroup = 'SUB_PROCESSOR'; Setting = 'CPMINCORES'; Value = 0 },
+        @{ Subgroup = 'SUB_PCIEXPRESS'; Setting = 'ASPM'; Value = 2 }
+    )
+
+    foreach ($setting in $settings) {
+        & powercfg /setdcvalueindex scheme_current $setting.Subgroup $setting.Setting $setting.Value
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not apply battery power setting $($setting.Setting)."
+        }
+    }
+
+    & powercfg /setactive scheme_current
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not re-activate the current power plan.'
+    }
+
+    Write-Host 'Applied battery C-state-friendly settings to the current power plan.' -ForegroundColor Green
+}
+
+Enable-BatteryCStateOptimization
+
 function Install-WingetPackage {
     param([Parameter(Mandatory)][string] $Id)
 
@@ -165,10 +212,16 @@ function Install-WindowsAutomationVim {
 
     $taskName = 'AutoHotkey Vim (Windows-Automation)'
     $userId = "$env:USERDOMAIN\$env:USERNAME"
-    $taskAction = New-ScheduledTaskAction -Execute $vimExe.FullName -WorkingDirectory $vimExe.DirectoryName
+    $vimLauncher = Join-Path $PSScriptRoot '.workspacer\start-vim-ahk.vbs'
+    if (!(Test-Path -LiteralPath $vimLauncher)) { throw "Vim AHK launcher not found: $vimLauncher" }
+    $taskAction = New-ScheduledTaskAction -Execute (Join-Path $env:WINDIR 'System32\wscript.exe') `
+        -Argument "`"$vimLauncher`" `"$($vimExe.FullName)`"" `
+        -WorkingDirectory $vimExe.DirectoryName
     $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
     $taskPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Highest
-    $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
+        -MultipleInstances IgnoreNew
     Register-ScheduledTask -TaskName $taskName -Action $taskAction -Trigger $taskTrigger -Principal $taskPrincipal -Settings $taskSettings -Force | Out-Null
     Start-ScheduledTask -TaskName $taskName
     Write-Host 'Configured elevated startup: AutoHotkey Vim (Windows-Automation)'

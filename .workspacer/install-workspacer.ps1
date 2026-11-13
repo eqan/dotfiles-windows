@@ -31,7 +31,9 @@ $taskAction = New-ScheduledTaskAction -Execute (Join-Path $env:WINDIR 'System32\
     -WorkingDirectory $repoRoot
 $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
 $taskPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Highest
-$taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+$taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
+    -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName $taskName -Action $taskAction -Trigger $taskTrigger `
     -Principal $taskPrincipal -Settings $taskSettings -Force | Out-Null
 
