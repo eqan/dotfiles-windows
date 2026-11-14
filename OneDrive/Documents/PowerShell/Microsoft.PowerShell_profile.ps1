@@ -1,289 +1,88 @@
-using namespace System.Management.Automation
-using namespace System.Management.Automation.Language
+﻿# Minimal Unix-oriented profile.
+# No prompt framework, Git module, icon module, PATH scanning, or eager shell
+# integrations are loaded here. This keeps new shells close to native speed.
 
-
-if ($host.Name -eq 'ConsoleHost')
-{
-    Import-Module PSReadLine
-}
-#Import-Module PSColors
-Import-Module posh-git
-Import-Module oh-my-posh
-Import-Module -Name Terminal-Icons
-set-alias desktop "Desktop.ps1"
-#Set-Theme ParadoxGlucose
-#Set-PoshPrompt -theme "D:\Dropbox\poshv3.json"
-
-oh-my-posh --init --shell pwsh --config "C:\Users\eqana\Documents\PowerShell\ohmyposhv3.json" | Invoke-Expression
-
-Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
-    param($wordToComplete, $commandAst, $cursorPosition)
-        [Console]::InputEncoding = [Console]::OutputEncoding = $OutputEncoding = [System.Text.Utf8Encoding]::new()
-        $Local:word = $wordToComplete.Replace('"', '""')
-        $Local:ast = $commandAst.ToString().Replace('"', '""')
-        winget complete --word="$Local:word" --commandline "$Local:ast" --position $cursorPosition | ForEach-Object {
-            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
-        }
-}
-
-
-# This is an example profile for PSReadLine.
-#
-# This is roughly what I use so there is some emphasis on emacs bindings,
-# but most of these bindings make sense in Windows mode as well.
-
-# Searching for commands with up/down arrow is really handy.  The
-# option "moves to end" is useful if you want the cursor at the end
-# of the line while cycling through history like it does w/o searching,
-# without that option, the cursor will remain at the position it was
-# when you used up arrow, which can be useful if you forget the exact
-# string you started the search on.
-Set-PSReadLineKeyHandler -Key UpArrow -Function HistorySearchBackward
-Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward
-
-#region Smart Insert/Delete
-
-# The next four key handlers are designed to make entering matched quotes
-# parens, and braces a nicer experience.  I'd like to include functions
-# in the module that do this, but this implementation still isn't as smart
-# as ReSharper, so I'm just providing it as a sample.
-
-Set-PSReadLineKeyHandler -Key '"',"'" `
-                         -BriefDescription SmartInsertQuote `
-                         -LongDescription "Insert paired quotes if not already on a quote" `
-                         -ScriptBlock {
-    param($key, $arg)
-
-    $quote = $key.KeyChar
-
-    $selectionStart = $null
-    $selectionLength = $null
-    [Microsoft.PowerShell.PSConsoleReadLine]::GetSelectionState([ref]$selectionStart, [ref]$selectionLength)
-
-    $line = $null
-    $cursor = $null
-    [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
-
-    # If text is selected, just quote it without any smarts
-    if ($selectionStart -ne -1)
-    {
-        [Microsoft.PowerShell.PSConsoleReadLine]::Replace($selectionStart, $selectionLength, $quote + $line.SubString($selectionStart, $selectionLength) + $quote)
-        [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($selectionStart + $selectionLength + 2)
-        return
+if ($host.Name -eq 'ConsoleHost') {
+    Import-Module PSReadLine -ErrorAction SilentlyContinue
+    Set-PSReadLineKeyHandler -Key UpArrow -Function HistorySearchBackward
+    Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward
+    Set-PSReadLineOption -EditMode Windows
+    try {
+        Set-PSReadLineOption -PredictionSource History
     }
-
-    $ast = $null
-    $tokens = $null
-    $parseErrors = $null
-    [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$ast, [ref]$tokens, [ref]$parseErrors, [ref]$null)
-
-    function FindToken
-    {
-        param($tokens, $cursor)
-
-        foreach ($token in $tokens)
-        {
-            if ($cursor -lt $token.Extent.StartOffset) { continue }
-            if ($cursor -lt $token.Extent.EndOffset) {
-                $result = $token
-                $token = $token -as [StringExpandableToken]
-                if ($token) {
-                    $nested = FindToken $token.NestedTokens $cursor
-                    if ($nested) { $result = $nested }
-                }
-
-                return $result
-            }
-        }
-        return $null
+    catch {
+        # Older Windows PowerShell does not support prediction settings.
     }
-
-    $token = FindToken $tokens $cursor
-
-    # If we're on or inside a **quoted** string token (so not generic), we need to be smarter
-    if ($token -is [StringToken] -and $token.Kind -ne [TokenKind]::Generic) {
-        # If we're at the start of the string, assume we're inserting a new string
-        if ($token.Extent.StartOffset -eq $cursor) {
-            [Microsoft.PowerShell.PSConsoleReadLine]::Insert("$quote$quote ")
-            [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursor + 1)
-            return
-        }
-
-        # If we're at the end of the string, move over the closing quote if present.
-        if ($token.Extent.EndOffset -eq ($cursor + 1) -and $line[$cursor] -eq $quote) {
-            [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursor + 1)
-            return
-        }
+    try {
+        Set-PSReadLineOption -PredictionViewStyle InlineView
     }
-
-    if ($null -eq $token -or
-        $token.Kind -eq [TokenKind]::RParen -or $token.Kind -eq [TokenKind]::RCurly -or $token.Kind -eq [TokenKind]::RBracket) {
-        if ($line[0..$cursor].Where{$_ -eq $quote}.Count % 2 -eq 1) {
-            # Odd number of quotes before the cursor, insert a single quote
-            [Microsoft.PowerShell.PSConsoleReadLine]::Insert($quote)
-        }
-        else {
-            # Insert matching quotes, move cursor to be in between the quotes
-            [Microsoft.PowerShell.PSConsoleReadLine]::Insert("$quote$quote")
-            [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursor + 1)
-        }
-        return
+    catch {
+        # Keep the host default prediction view when InlineView is unavailable.
     }
-
-    # If cursor is at the start of a token, enclose it in quotes.
-    if ($token.Extent.StartOffset -eq $cursor) {
-        if ($token.Kind -eq [TokenKind]::Generic -or $token.Kind -eq [TokenKind]::Identifier -or 
-            $token.Kind -eq [TokenKind]::Variable -or $token.TokenFlags.hasFlag([TokenFlags]::Keyword)) {
-            $end = $token.Extent.EndOffset
-            $len = $end - $cursor
-            [Microsoft.PowerShell.PSConsoleReadLine]::Replace($cursor, $len, $quote + $line.SubString($cursor, $len) + $quote)
-            [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($end + 2)
-            return
-        }
+    try {
+        Set-PSReadLineKeyHandler -Key Tab -Function AcceptSuggestion
     }
-
-    # We failed to be smart, so just insert a single quote
-    [Microsoft.PowerShell.PSConsoleReadLine]::Insert($quote)
-}
-
-Set-PSReadLineKeyHandler -Key '(','{','[' `
-                         -BriefDescription InsertPairedBraces `
-                         -LongDescription "Insert matching braces" `
-                         -ScriptBlock {
-    param($key, $arg)
-
-    $closeChar = switch ($key.KeyChar)
-    {
-        <#case#> '(' { [char]')'; break }
-        <#case#> '{' { [char]'}'; break }
-        <#case#> '[' { [char]']'; break }
-    }
-
-    $selectionStart = $null
-    $selectionLength = $null
-    [Microsoft.PowerShell.PSConsoleReadLine]::GetSelectionState([ref]$selectionStart, [ref]$selectionLength)
-
-    $line = $null
-    $cursor = $null
-    [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
-    
-    if ($selectionStart -ne -1)
-    {
-      # Text is selected, wrap it in brackets
-      [Microsoft.PowerShell.PSConsoleReadLine]::Replace($selectionStart, $selectionLength, $key.KeyChar + $line.SubString($selectionStart, $selectionLength) + $closeChar)
-      [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($selectionStart + $selectionLength + 2)
-    } else {
-      # No text is selected, insert a pair
-      [Microsoft.PowerShell.PSConsoleReadLine]::Insert("$($key.KeyChar)$closeChar")
-      [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursor + 1)
+    catch {
+        # Older PSReadLine uses the normal completion menu instead.
+        Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
     }
 }
 
-Set-PSReadLineKeyHandler -Key ')',']','}' `
-                         -BriefDescription SmartCloseBraces `
-                         -LongDescription "Insert closing brace or skip" `
-                         -ScriptBlock {
-    param($key, $arg)
-
-    $line = $null
-    $cursor = $null
-    [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
-
-    if ($line[$cursor] -eq $key.KeyChar)
-    {
-        [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursor + 1)
-    }
-    else
-    {
-        [Microsoft.PowerShell.PSConsoleReadLine]::Insert("$($key.KeyChar)")
-    }
+function global:prompt {
+    $esc = [char]27
+    $userIcon = [char]0xF007
+    $folder = [char]0xF07B
+    $arrow = [char]0x276F
+    $reset = "${esc}[0m"
+    $cyan = "${esc}[38;5;117m"
+    $yellow = "${esc}[38;5;221m"
+    $muted = "${esc}[38;5;244m"
+    $location = $executionContext.SessionState.Path.CurrentLocation.ToString()
+    if ($location.StartsWith($HOME, [System.StringComparison]::OrdinalIgnoreCase)) { $location = '~' + $location.Substring($HOME.Length) }
+    "${cyan}${userIcon} $env:USERNAME ${muted}| ${yellow}$folder $location ${cyan}$arrow${reset} "
 }
 
+# Native Rust directory tools are resolved only when used, not during startup.
+Remove-Item Alias:ls -Force -ErrorAction SilentlyContinue
+function global:ls { if (Get-Command eza.exe -ErrorAction SilentlyContinue) { & eza.exe --icons --group-directories-first @args } else { Get-ChildItem @args } }
+function global:ll { if (Get-Command eza.exe -ErrorAction SilentlyContinue) { & eza.exe --long --header --icons --group-directories-first @args } else { Get-ChildItem @args | Format-Table } }
+function global:la { if (Get-Command eza.exe -ErrorAction SilentlyContinue) { & eza.exe --long --all --header --icons --group-directories-first @args } else { Get-ChildItem -Force @args | Format-Table } }
+function global:tree { if (Get-Command eza.exe -ErrorAction SilentlyContinue) { & eza.exe --tree --icons @args } else { Get-ChildItem @args -Recurse } }
+function global:y { & yazi.exe @args }
 
-# Insert text from the clipboard as a here string
-Set-PSReadLineKeyHandler -Key Ctrl+V `
-                         -BriefDescription PasteAsHereString `
-                         -LongDescription "Paste the clipboard text as a here string" `
-                         -ScriptBlock {
-    param($key, $arg)
+Remove-Item Alias:cat -Force -ErrorAction SilentlyContinue
+function global:cat { if (Get-Command cat.exe -ErrorAction SilentlyContinue) { & cat.exe @args } else { Get-Content @args } }
 
-    Add-Type -Assembly PresentationCore
-    if ([System.Windows.Clipboard]::ContainsText())
-    {
-        # Get clipboard text - remove trailing spaces, convert \r\n to \n, and remove the final \n.
-        $text = ([System.Windows.Clipboard]::GetText() -replace "\p{Zs}*`r?`n","`n").TrimEnd()
-        [Microsoft.PowerShell.PSConsoleReadLine]::Insert("@'`n$text`n'@")
-    }
-    else
-    {
-        [Microsoft.PowerShell.PSConsoleReadLine]::Ding()
-    }
+function global:touch {
+    param([Parameter(Mandatory, Position = 0)][string]$Path)
+    if (Test-Path -LiteralPath $Path) { (Get-Item -LiteralPath $Path).LastWriteTime = Get-Date }
+    else { New-Item -ItemType File -Path $Path -Force | Out-Null }
 }
 
-Set-PSReadLineOption -PredictionSource History
-Set-PSReadLineOption -PredictionViewStyle ListView
-Set-PSReadLineOption -EditMode Windows
+if (Test-Path -LiteralPath 'C:\Program Files\Neovim\bin\nvim.exe') { Set-Alias nvim 'C:\Program Files\Neovim\bin\nvim.exe' -Scope Global }
+if (Test-Path -LiteralPath 'C:\Users\eqan\go\bin\lf.exe') { Set-Alias lf 'C:\Users\eqan\go\bin\lf.exe' -Scope Global }
+if (Get-Command go.exe -ErrorAction SilentlyContinue) { Set-Alias go (Get-Command go.exe).Source -Scope Global }
 
-
-# Unix style aliases
-Function touch
-{
-    $file = $args[0]
-    if($file -eq $null) {
-        throw "No filename supplied"
-    }
-
-    if(Test-Path $file)
-    {
-        (Get-ChildItem $file).LastWriteTime = Get-Date
-    }
-    else
-    {
-        echo $null > $file
-    }
-}
-
-Set-Alias nvim 'C:\Program Files\Neovim\bin\nvim.exe'
-Set-Alias go 'C:\Program Files\Go\bin\go.exe'
-Set-Alias lf 'C:\Users\eqana\go\bin\lf.exe'
-Set-Alias grep 'C:\ProgramData\chocolatey\bin\grep.exe'
-Set-Alias rprofile '. $profile'
+function global:rprofile { . $PROFILE }
+Set-Alias desktop Desktop.ps1 -Scope Global
 
 function global:refresh-vim-ahk {
     [CmdletBinding()]
     param([switch]$NoPull)
-
     $automationRoot = Join-Path $env:LOCALAPPDATA 'Windows-Automation'
     $taskName = 'AutoHotkey Vim (Windows-Automation)'
     $buildScript = Join-Path $automationRoot 'build.bat'
-
-    if (!(Test-Path -LiteralPath $buildScript)) {
-        throw "Windows-Automation was not found at $automationRoot. Run the dotfiles installer first."
-    }
-
-    $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-    if ($task) {
-        Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-        Start-Sleep -Milliseconds 500
-    }
-
+    if (!(Test-Path -LiteralPath $buildScript)) { throw "Windows-Automation was not found at $automationRoot. Run the dotfiles installer first." }
+    Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     Get-Process -Name vim_ahk -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-
-    if (!$NoPull -and (Get-Command git -ErrorAction SilentlyContinue)) {
-        git -C $automationRoot pull --ff-only
+    if (!$NoPull -and (Get-Command git.exe -ErrorAction SilentlyContinue)) {
+        git.exe -C $automationRoot pull --ff-only
         if ($LASTEXITCODE -ne 0) { throw 'Windows-Automation could not be updated with git pull.' }
     }
-
     Push-Location $automationRoot
-    try {
-        & cmd.exe /d /c '.\build.bat'
-        if ($LASTEXITCODE -ne 0) { throw "Windows-Automation build failed with exit code $LASTEXITCODE." }
-    }
-    finally {
-        Pop-Location
-    }
-
-    if ($task) {
+    try { & cmd.exe /d /c '.\build.bat'; if ($LASTEXITCODE -ne 0) { throw "Windows-Automation build failed with exit code $LASTEXITCODE." } }
+    finally { Pop-Location }
+    if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {
         Start-ScheduledTask -TaskName $taskName
         Write-Host 'Vim AHK rebuilt and restarted through the elevated scheduled task.' -ForegroundColor Green
     }
@@ -293,43 +92,23 @@ function global:refresh-vim-ahk {
         Write-Warning 'The elevated Vim AHK scheduled task was not found; started the executable normally.'
     }
 }
-Set-Alias -Name vim-refresh -Value refresh-vim-ahk -Scope Global
+Set-Alias vim-refresh refresh-vim-ahk -Scope Global
 
-function global:which ([string]$command) {
-  if (-not($command)) { throw "ERROR: Please supply a command name" }
-  (Get-Command $command).Path
+function global:which([string]$Command) { if (!$Command) { throw 'Usage: which command' }; (Get-Command $Command -ErrorAction Stop).Source }
+function global:cd... { Set-Location ..\.. }
+function global:cd.... { Set-Location ..\..\.. }
+function global:md5 { Get-FileHash -Algorithm MD5 @args }
+function global:sha1 { Get-FileHash -Algorithm SHA1 @args }
+function global:sha256 { Get-FileHash -Algorithm SHA256 @args }
+
+Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+    winget complete --word="$($wordToComplete.Replace('"', '""'))" --commandline "$($commandAst.ToString().Replace('"', '""'))" --position $cursorPosition | ForEach-Object {
+        [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+    }
 }
 
-# Useful shortcuts for traversing directories
-function cd...  { cd ..\.. }
-function cd.... { cd ..\..\.. }
 
-# Compute file hashes - useful for checking successful downloads 
-function md5    { Get-FileHash -Algorithm MD5 $args }
-function sha1   { Get-FileHash -Algorithm SHA1 $args }
-function sha256 { Get-FileHash -Algorithm SHA256 $args }
 
-# Set UNIX-like aliases for the admin command, so sudo <command> will run the command
-# with elevated rights. 
-Set-Alias -Name su -Value admin
-Set-Alias -Name sudo -Value admin
 
-$LFCD="~/.config/lf/lfcd.ps1"                                #  pre-built binary, make sure to use absolute path
-$LF_ICONS="~/.config/lf/icons.txt"
-
-Set-PSReadLineKeyHandler -Chord Ctrl+o -ScriptBlock {
-   [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
-   [Microsoft.PowerShell.PSConsoleReadLine]::Insert($LFCD)
-   [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
-}
-
-# Import the Chocolatey Profile that contains the necessary code to enable
-# tab-completions to function for `choco`.
-# Be aware that if you are missing these lines from your profile, tab completion
-# for `choco` will not function.
-# See https://ch0.co/tab-completion for details.
-$ChocolateyProfile = "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
-if (Test-Path($ChocolateyProfile)) {
-Import-Module "$ChocolateyProfile"
-}
 

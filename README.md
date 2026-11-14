@@ -25,7 +25,9 @@ The installer:
 - At the start, optionally enables battery C-state-friendly power settings: processor
   idle and core parking, 5% minimum battery processor state, and maximum PCIe ASPM
 - Installs AutoHotkey v1.1.37.02 for the repository's Vim AHK configuration
-- Installs Oh My Posh and the `posh-git`, `Terminal-Icons`, and `PSReadLine` PowerShell dependencies
+- Installs PSReadLine; the profile uses a minimal native prompt with no prompt framework,
+  `posh-git`, or `Terminal-Icons` startup dependency
+- Installs native Unix-oriented tools: eza, zoxide, and Yazi, alongside Microsoft Coreutils
 - Installs JetBrainsMono Nerd Font for prompt icons and configures Windows Terminal to use it
 - Installs Microsoft Coreutils (`cat`, `grep`, `find`, `xargs`, and related Unix-style commands)
 - Installs `lf`, `ripgrep`, `fd`, `fzf`, `bat`, `jq`, Git, and GitHub CLI

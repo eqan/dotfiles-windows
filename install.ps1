@@ -141,9 +141,11 @@ $packages = @(
     'VideoLAN.VLC',
     '7zip.7zip',
     'Zen-Team.Zen-Browser',
-    'JanDeDobbeleer.OhMyPosh',
     'DEVCOM.JetBrainsMonoNerdFont',
     'Microsoft.Coreutils',
+    'eza-community.eza',
+    'ajeetdsouza.zoxide',
+    'sxyazi.yazi',
     'gokcehan.lf',
     'BurntSushi.ripgrep.MSVC',
     'sharkdp.fd',
@@ -383,7 +385,7 @@ foreach ($settingsPath in $terminalSettings) {
 if (Get-Command Install-Module -ErrorAction SilentlyContinue) {
     try {
         Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction Stop | Out-Null
-        foreach ($module in @('posh-git', 'Terminal-Icons', 'PSReadLine')) {
+        foreach ($module in @('PSReadLine')) {
             $available = Get-Module -ListAvailable -Name $module |
                 Sort-Object Version -Descending |
                 Select-Object -First 1
@@ -435,30 +437,6 @@ if ($profileSource) {
         Copy-Item -LiteralPath $profileSource.FullName -Destination $target -Force
 
         $profileText = Get-Content -LiteralPath $target -Raw
-        $profileText = [regex]::Replace(
-            $profileText,
-            '(?m)^\s*Import-Module\s+oh-my-posh\s*\r?$\r?\n?',
-            '')
-
-        $theme = Get-ChildItem -LiteralPath $repoRoot -Recurse -File `
-            -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.FullName -notmatch '\\.git\\' -and
-                $_.Extension -eq '.json' -and
-                $_.Name -like '*.omp.json'
-            } |
-            Select-Object -First 1
-        $themePath = if ($theme) { $theme.FullName } else { $null }
-        $initLine = if ($themePath) {
-            "if (Get-Command oh-my-posh -ErrorAction SilentlyContinue) { oh-my-posh init powershell --config '$themePath' | Invoke-Expression }"
-        }
-        else {
-            "if (Get-Command oh-my-posh -ErrorAction SilentlyContinue) { oh-my-posh init powershell | Invoke-Expression }"
-        }
-        $profileText = [regex]::Replace(
-            $profileText,
-            '(?m)^\s*oh-my-posh\s+.*\r?$\r?\n?',
-            "$initLine`r`n")
         Set-Content -LiteralPath $target -Value $profileText -Encoding UTF8
         Write-Host "Enabled PowerShell profile: $target"
     }
