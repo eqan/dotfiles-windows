@@ -6,7 +6,7 @@ if ($host.Name -eq 'ConsoleHost') {
     Import-Module PSReadLine -ErrorAction SilentlyContinue
     Set-PSReadLineKeyHandler -Key UpArrow -Function HistorySearchBackward
     Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward
-    Set-PSReadLineOption -EditMode Windows
+    Set-PSReadLineOption -EditMode Vi
     try {
         Set-PSReadLineOption -PredictionSource History
     }
@@ -20,7 +20,19 @@ if ($host.Name -eq 'ConsoleHost') {
         # Keep the host default prediction view when InlineView is unavailable.
     }
     try {
-        Set-PSReadLineKeyHandler -Key Tab -Function AcceptSuggestion
+        Set-PSReadLineKeyHandler -Key Tab -ScriptBlock {
+            param($key, $arg)
+            $before = $null
+            $beforeCursor = 0
+            [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$before, [ref]$beforeCursor)
+            [Microsoft.PowerShell.PSConsoleReadLine]::AcceptSuggestion()
+            $after = $null
+            $afterCursor = 0
+            [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$after, [ref]$afterCursor)
+            if ($before -eq $after -and $beforeCursor -eq $afterCursor) {
+                [Microsoft.PowerShell.PSConsoleReadLine]::MenuComplete()
+            }
+        }
     }
     catch {
         # Older PSReadLine uses the normal completion menu instead.
@@ -66,6 +78,19 @@ if (Get-Command go.exe -ErrorAction SilentlyContinue) { Set-Alias go (Get-Comman
 function global:rprofile { . $PROFILE }
 Set-Alias desktop Desktop.ps1 -Scope Global
 
+function global:go-vim-ahk {
+    $path = Join-Path $env:LOCALAPPDATA 'Windows-Automation'
+    if (!(Test-Path -LiteralPath $path)) { throw "Vim AHK checkout was not found at $path." }
+    Set-Location -LiteralPath $path
+}
+function global:go-dotfiles {
+    $path = Join-Path $HOME '.config\dotfiles-windows'
+    if (!(Test-Path -LiteralPath $path)) { throw "Dotfiles checkout was not found at $path." }
+    Set-Location -LiteralPath $path
+}
+Set-Alias -Name vim-ahk -Value go-vim-ahk -Scope Global
+Set-Alias -Name dotfiles -Value go-dotfiles -Scope Global
+
 function global:refresh-vim-ahk {
     [CmdletBinding()]
     param([switch]$NoPull)
@@ -107,6 +132,8 @@ Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
         [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
     }
 }
+
+
 
 
 

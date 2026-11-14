@@ -143,6 +143,7 @@ $packages = @(
     'Zen-Team.Zen-Browser',
     'DEVCOM.JetBrainsMonoNerdFont',
     'Microsoft.Coreutils',
+    'wez.wezterm',
     'eza-community.eza',
     'ajeetdsouza.zoxide',
     'sxyazi.yazi',
@@ -158,6 +159,17 @@ $packages = @(
 
 foreach ($package in $packages) {
     Install-WingetPackage $package
+}
+
+# ---- WezTerm configuration ----
+$weztermSource = Join-Path $repoRoot 'wezterm\wezterm.lua'
+if (Test-Path -LiteralPath $weztermSource) {
+    $weztermTarget = Join-Path $env:USERPROFILE '.wezterm.lua'
+    if (Test-Path -LiteralPath $weztermTarget) {
+        Copy-Item -LiteralPath $weztermTarget -Destination "$weztermTarget.bak" -Force
+    }
+    Copy-Item -LiteralPath $weztermSource -Destination $weztermTarget -Force
+    Write-Host "Configured WezTerm with PowerShell 7 as the default shell: $weztermTarget"
 }
 
 # ---- (unchanged) AutoHotkey v1 setup ----
@@ -196,6 +208,30 @@ function Install-WindowsAutomationVim {
     else {
         git -C $automationRoot pull --ff-only
         if ($LASTEXITCODE -ne 0) { Write-Warning 'Could not update Windows-Automation; using its current files.' }
+    }
+
+    $customCommands = Join-Path $automationRoot 'lib\custom_commands.ahk'
+    if (Test-Path -LiteralPath $customCommands) {
+        $customText = Get-Content -LiteralPath $customCommands -Raw
+        $updatedCustomText = [regex]::Replace(
+            $customText,
+            '(?m)^\s*Run \*RunAs wt, , max\s*$',
+            '  Run *RunAs "C:\Program Files\WezTerm\wezterm-gui.exe", , max')
+        if ($updatedCustomText -ne $customText) {
+            Set-Content -LiteralPath $customCommands -Value $updatedCustomText -Encoding UTF8
+            Write-Host 'Configured AutoHotkey Win+X to launch elevated WezTerm.'
+        }
+    }
+
+    $vimSource = Join-Path $automationRoot 'lib\vim_ahk.ahk'
+    if (Test-Path -LiteralPath $vimSource) {
+        $vimText = Get-Content -LiteralPath $vimSource -Raw
+        $exclusionReplacement = '    if WinActive("ahk_exe WindowsTerminal.exe") || WinActive("ahk_exe wt.exe") || WinActive("ahk_exe wezterm-gui.exe") || WinActive("ahk_exe wezterm.exe") || WinActive("ahk_exe zen.exe"){'+[Environment]::NewLine+'      Return False'+[Environment]::NewLine+'    }'
+        $updatedVimText = $vimText -replace '(?m)^\s*if WinActive\("ahk_exe WindowsTerminal\.exe"\).*?\{\r?\n\s*Return False\r?\n\s*\}', $exclusionReplacement
+        if ($updatedVimText -ne $vimText) {
+            Set-Content -LiteralPath $vimSource -Value $updatedVimText -Encoding UTF8
+            Write-Host 'Configured Vim AHK to stay disabled in WezTerm.'
+        }
     }
 
     if (!(Test-Path -LiteralPath $buildScript)) { throw "Windows-Automation build script not found: $buildScript" }

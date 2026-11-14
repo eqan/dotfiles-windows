@@ -27,6 +27,8 @@ The installer:
 - Installs AutoHotkey v1.1.37.02 for the repository's Vim AHK configuration
 - Installs PSReadLine; the profile uses a minimal native prompt with no prompt framework,
   `posh-git`, or `Terminal-Icons` startup dependency
+- Installs WezTerm, a Rust terminal emulator with tabs and panes, configured to launch
+  PowerShell 7 by default
 - Installs native Unix-oriented tools: eza, zoxide, and Yazi, alongside Microsoft Coreutils
 - Installs JetBrainsMono Nerd Font for prompt icons and configures Windows Terminal to use it
 - Installs Microsoft Coreutils (`cat`, `grep`, `find`, `xargs`, and related Unix-style commands)
@@ -34,6 +36,7 @@ The installer:
 - Detects the repository's `nircmd` files
 - Installs Workspacer with WinGet (`rickbutton.workspacer`)
 - Builds `vim_ahk.exe` from `eqan/Windows-Automation`
+- Configures Vim AHK `Win+X` to launch elevated WezTerm instead of Windows Terminal
 - Registers Workspacer and Vim AHK as elevated startup tasks with highest privileges
 - Uses this repository as the Workspacer configuration root
 - Starts Workspacer and Vim AHK with the committed configuration
@@ -45,6 +48,13 @@ The installer:
 ```
 
 Useful shortcuts include `Alt+C` to close the focused window and the standard Workspacer workspace/layout shortcuts.
+
+PowerShell shortcuts include `vim-ahk` to enter the Windows-Automation checkout and
+`dotfiles` to enter this repository. Tab accepts an inline history suggestion; when
+no suggestion exists, it opens normal command and file completion.
+
+PowerShell uses PSReadLine's native Vi editing mode. Vim AHK remains available for
+other applications but is explicitly disabled inside WezTerm.
 
 The installer backs up and updates Windows Terminal's `settings.json` to use **JetBrainsMono Nerd Font**. Restart Windows Terminal after setup so the font change takes effect.
 
