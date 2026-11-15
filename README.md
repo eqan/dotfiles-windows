@@ -47,7 +47,11 @@ The installer:
 & ".\.workspacer\start-workspacer.cmd"
 ```
 
-Useful shortcuts include `Alt+C` to close the focused window and the standard Workspacer workspace/layout shortcuts.
+Workspacer now uses the left Windows key as its modifier: `Win+H/L` switches
+workspaces, `Win+J/K` changes focus, `Win+1..9` switches directly, and
+`Win+Space` cycles layouts. `Alt+C` remains the close-focused-window shortcut.
+The AHK layer suppresses the standalone Windows-key Start popup while passing
+Win combinations through to Workspacer.
 
 PowerShell shortcuts include `vim-ahk` to enter the Windows-Automation checkout and
 `dotfiles` to enter this repository. Tab accepts an inline history suggestion; when
@@ -58,7 +62,18 @@ other applications but is explicitly disabled inside WezTerm.
 
 The installer backs up and updates Windows Terminal's `settings.json` to use **JetBrainsMono Nerd Font**. Restart Windows Terminal after setup so the font change takes effect.
 
-PowerToys Run is the Windows Search replacement. Press `Alt+Space` to launch it, then search for applications, files, settings, and commands.
+Flameshot is the lightweight screenshot replacement. The bootstrap removes the
+per-user Microsoft Snipping Tool package. WezTerm is the terminal replacement;
+the bootstrap also removes the per-user Windows Terminal package when present.
+Flameshot supports region,
+window, fullscreen, clipboard, annotation, blur, and export workflows without
+the larger ShareX suite. `Win+Shift+S` starts region capture and copies the
+result to the clipboard; Flameshot is started automatically at logon.
+
+PowerToys Run is the Windows Search replacement. Its explicit shortcut is
+`Win+Alt+S`, and the installer enables PowerToys Run's native `Win+S` override,
+so both combinations open the same search interface without competing global
+keyboard remaps.
 
 ## Debloating and default applications
 
@@ -102,8 +117,8 @@ vim-refresh
 Use `vim-refresh -NoPull` to rebuild the existing checkout without pulling from GitHub. Windows Terminal and Zen Browser are excluded from Vim AHK, and Normal mode blocks ordinary text input while preserving Vim bindings.
 
 WinShotX is not installed or started by this setup. Use Windows' built-in
-`Win+Shift+S` shortcut for Snipping Tool. The installer also removes the old
-WinShotX-related PowerToys remaps if they are present.
+`Win+Shift+S` shortcut for Snipping Tool. The installer removes old
+WinShotX-related remaps and configures PowerToys Run to handle `Win+S` natively.
 
 ## Commit changes
 

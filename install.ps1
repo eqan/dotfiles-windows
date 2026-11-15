@@ -132,11 +132,42 @@ function Set-SecurityOnlyWindowsUpdates {
 
 Set-SecurityOnlyWindowsUpdates
 
+function Remove-ReplacedWindowsScreenshotApp {
+    $snippingTool = Get-AppxPackage -Name Microsoft.ScreenSketch -ErrorAction SilentlyContinue
+    if ($snippingTool) {
+        foreach ($package in @($snippingTool)) {
+            Remove-AppxPackage -Package $package.PackageFullName -ErrorAction Stop
+        }
+        Write-Host 'Removed the native Snipping Tool; Flameshot is the screenshot replacement.'
+    }
+    else {
+        Write-Host 'Native Snipping Tool is already removed for this user.'
+    }
+}
+
+Remove-ReplacedWindowsScreenshotApp
+
+function Remove-ReplacedWindowsTerminal {
+    $windowsTerminal = Get-AppxPackage -Name Microsoft.WindowsTerminal -ErrorAction SilentlyContinue
+    if ($windowsTerminal) {
+        foreach ($package in @($windowsTerminal)) {
+            Remove-AppxPackage -Package $package.PackageFullName -ErrorAction Stop
+        }
+        Write-Host 'Removed native Windows Terminal; WezTerm is the configured terminal.'
+    }
+    else {
+        Write-Host 'Native Windows Terminal is already removed for this user.'
+    }
+}
+
+Remove-ReplacedWindowsTerminal
+
 # ---- package installation ----
 $packages = @(
     'Microsoft.PowerShell',
     'Neovim.Neovim',
     'Microsoft.PowerToys',
+    'Flameshot.Flameshot',
     'ArtifexSoftware.mutool',
     'VideoLAN.VLC',
     '7zip.7zip',
@@ -159,6 +190,21 @@ $packages = @(
 
 foreach ($package in $packages) {
     Install-WingetPackage $package
+}
+
+# ---- lightweight screenshot capture ----
+$flameshotExe = 'C:\Program Files\Flameshot\bin\flameshot.exe'
+if (Test-Path -LiteralPath $flameshotExe) {
+    Get-Process flameshot -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    $startupRunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+    New-Item -Path $startupRunKey -Force | Out-Null
+    Set-ItemProperty -Path $startupRunKey -Name Flameshot -Value ('"' + $flameshotExe + '"')
+    Remove-ItemProperty -Path $startupRunKey -Name Greenshot -ErrorAction SilentlyContinue
+    Start-Process -FilePath $flameshotExe
+    Write-Host 'Configured lightweight Flameshot capture-to-clipboard on Win+Shift+S and startup.'
+}
+else {
+    Write-Warning 'Flameshot was not found after installation; screenshot replacement was skipped.'
 }
 
 # ---- WezTerm configuration ----
@@ -217,9 +263,71 @@ function Install-WindowsAutomationVim {
             $customText,
             '(?m)^\s*Run \*RunAs wt, , max\s*$',
             '  Run *RunAs "C:\Program Files\WezTerm\wezterm-gui.exe", , max')
+        if ($updatedCustomText -notmatch '(?m)^#s::\s*$') {
+            $updatedCustomText = '; Open PowerToys search from Win+S without invoking Windows Search.' +
+                [Environment]::NewLine + '#s::' + [Environment]::NewLine +
+                '  Send, #!s' + [Environment]::NewLine + 'Return' +
+                [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
+        }
+        if ($updatedCustomText -notmatch '(?m)^#\+s::\s*$') {
+            $updatedCustomText = '; Replace Windows Snipping Tool with Flameshot region capture to clipboard.' +
+                [Environment]::NewLine + '#+s::' + [Environment]::NewLine +
+                '  Run, "C:\Program Files\Flameshot\bin\flameshot.exe" gui --clipboard,, Hide' + [Environment]::NewLine + 'Return' +
+                [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
+        }
+        if ($updatedCustomText -notmatch '(?m)^#MenuMaskKey\s+') {
+            # vkFF is documented as "no mapping" and avoids vk07, which newer Windows versions reserve.
+            $updatedCustomText = '#MenuMaskKey vkFF' + [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
+        }
+        $updatedCustomText = $updatedCustomText -replace '(?ms); Close the Start/menu overlay for a standalone Win press without intercepting Win\+key combinations\.?\r?\n~LWin Up::.*?Return\r?\n\r?\n~RWin Up::.*?Return\r?\n\r?\n', ''
+        if ($false) {
+            $standaloneWinMask = '; Suppress Start for a standalone Win press while preserving Win+key shortcuts.' +
+                [Environment]::NewLine + '; The original Win events are blocked, then re-emitted so Workspacer still' +
+                [Environment]::NewLine + '; receives the modifier. vkFF is a harmless "no mapping" key-up mask.' +
+                [Environment]::NewLine + 'LWin::' + [Environment]::NewLine +
+                '  Send, {LWin Down}' + [Environment]::NewLine + 'Return' +
+                [Environment]::NewLine + [Environment]::NewLine + 'LWin Up::' +
+                [Environment]::NewLine + '  Send, {Blind}{vkFF}{LWin Up}' + [Environment]::NewLine + 'Return' +
+                [Environment]::NewLine + [Environment]::NewLine + 'RWin::' +
+                [Environment]::NewLine + '  Send, {RWin Down}' + [Environment]::NewLine + 'Return' +
+                [Environment]::NewLine + [Environment]::NewLine + 'RWin Up::' +
+                [Environment]::NewLine + '  Send, {Blind}{vkFF}{RWin Up}' + [Environment]::NewLine + 'Return' +
+                [Environment]::NewLine + [Environment]::NewLine
+            $updatedCustomText = $standaloneWinMask + $updatedCustomText
+        }
+        if ($false) {
+            $workspacerWinMask = '; Re-emit Workspacer''s Win combinations explicitly so Windows never treats' +
+                [Environment]::NewLine + '; the synthetic modifier sequence as a request to open Start.' +
+                [Environment]::NewLine + '#h::Send, {Blind}{LWin Down}h{LWin Up}' +
+                [Environment]::NewLine + '#l::Send, {Blind}{LWin Down}l{LWin Up}' +
+                [Environment]::NewLine + '#j::Send, {Blind}{LWin Down}j{LWin Up}' +
+                [Environment]::NewLine + '#k::Send, {Blind}{LWin Down}k{LWin Up}' +
+                [Environment]::NewLine + '#Space::Send, {Blind}{LWin Down}{Space}{LWin Up}' +
+                [Environment]::NewLine + '#Enter::Send, {Blind}{LWin Down}{Enter}{LWin Up}' +
+                [Environment]::NewLine + '#q::Send, {Blind}{LWin Down}q{LWin Up}' +
+                [Environment]::NewLine + '#Escape::Send, {Blind}{LWin Down}{Escape}{LWin Up}' +
+                [Environment]::NewLine + '#n::Send, {Blind}{LWin Down}n{LWin Up}' +
+                [Environment]::NewLine + '#c::Send, {Blind}{LWin Down}c{LWin Up}'
+            for ($i = 1; $i -le 9; $i++) {
+                $workspacerWinMask += [Environment]::NewLine + "#$i::Send, {Blind}{LWin Down}$i{LWin Up}"
+            }
+            $workspacerWinMask += [Environment]::NewLine + '#+h::Send, {Blind}{LWin Down}{LShift Down}h{LShift Up}{LWin Up}' +
+                [Environment]::NewLine + '#+l::Send, {Blind}{LWin Down}{LShift Down}l{LShift Up}{LWin Up}' +
+                [Environment]::NewLine + '#+Space::Send, {Blind}{LWin Down}{LShift Down}{Space}{LShift Up}{LWin Up}'
+            for ($i = 1; $i -le 9; $i++) {
+                $workspacerWinMask += [Environment]::NewLine + "#+$i::Send, {Blind}{LWin Down}{LShift Down}$i{LShift Up}{LWin Up}"
+            }
+            $updatedCustomText = $workspacerWinMask + [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
+        }
+        $updatedCustomText = $updatedCustomText -replace '(?ms); Prevent the Start/menu popup while preserving the physical Win modifier\.\r?\n; VKE8 is an unused virtual key; Windows sees a modifier combination instead\r?\n; of treating a standalone Win press as a request to open Start\.\r?\n~LWin::.*?Return\r?\n\r?\n~RWin::.*?Return\r?\n\r?\n', ''
+        $updatedCustomText = $updatedCustomText -replace '(?ms); Close the Start/menu overlay for a standalone Win press without intercepting Win\+key combinations used by Workspacer\.\r?\n~LWin Up::.*?Return\r?\n\r?\n~RWin Up::.*?Return\r?\n\r?\n', ''
+        # These two legacy AHK bindings conflict with Workspacer's Win+H/Win+J.
+        $updatedCustomText = $updatedCustomText -replace '(?m)^#h::\s*$', '!h::'
+        $updatedCustomText = $updatedCustomText -replace '(?m)^#j::\s*$', '!j::'
+        $updatedCustomText = $updatedCustomText -replace '(?ms); Suppress standalone Windows-key presses while preserving Win\+key shortcuts\.\r?\n\$LWin::\r?\n\s*KeyWait, LWin\r?\nReturn\r?\n\r?\n\$RWin::\r?\n\s*KeyWait, RWin\r?\nReturn\r?\n\r?\n', ''
         if ($updatedCustomText -ne $customText) {
             Set-Content -LiteralPath $customCommands -Value $updatedCustomText -Encoding UTF8
-            Write-Host 'Configured AutoHotkey Win+X to launch elevated WezTerm.'
+            Write-Host 'Configured AutoHotkey Win+X for WezTerm and Win+S for PowerToys search.'
         }
     }
 
@@ -303,6 +411,16 @@ function Configure-PowerToysRemaps {
         $profile = [pscustomobject]@{}
     }
 
+    if (!$profile.PSObject.Properties['remapKeys']) {
+        $profile | Add-Member -NotePropertyName remapKeys -NotePropertyValue ([pscustomobject]@{})
+    }
+    if (!$profile.remapKeys.PSObject.Properties['global']) {
+        $profile.remapKeys | Add-Member -NotePropertyName global -NotePropertyValue @()
+    }
+    # Do not globally remap Left Win: it changes the meaning of Win in every application.
+    $profile.remapKeys.global = @($profile.remapKeys.global) |
+        Where-Object { $_ -and $_.originalKeys -notin @('91', '165') }
+
     if (!$profile.PSObject.Properties['remapShortcuts']) {
         $profile | Add-Member -NotePropertyName remapShortcuts -NotePropertyValue ([pscustomobject]@{})
     }
@@ -310,11 +428,44 @@ function Configure-PowerToysRemaps {
         $profile.remapShortcuts | Add-Member -NotePropertyName global -NotePropertyValue @()
     }
 
-    $profile.remapShortcuts.global = @($profile.remapShortcuts.global) |
-        Where-Object { $_.originalKeys -ne '91;160;83' -and $_.originalKeys -ne '162;160;83' }
+    # Remove obsolete WinShotX and Win+S Keyboard Manager mappings. PowerToys
+    # Run has a native Win+S override which is more reliable than chaining two
+    # global keyboard hooks.
+    $globalRemaps = @($profile.remapShortcuts.global) |
+        Where-Object {
+            $_ -and
+            $_.originalKeys -notin @('91;160;83', '162;160;83', '91;83')
+        }
+    # Keep this as an actual JSON array even when it contains one entry.
+    $profile.remapShortcuts.global = [object[]]$globalRemaps
 
     $profile | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $profilePath -Encoding UTF8
-    Write-Host 'Removed obsolete WinShotX screenshot remaps from PowerToys'
+    Write-Host 'Preserved native Win behavior; removed conflicting global Win remaps'
+
+    $runSettingsPath = Join-Path $env:LOCALAPPDATA 'MicrosoftPowerToysPowerToys Runsettings.json'
+    if (Test-Path -LiteralPath $runSettingsPath) {
+        $runSettings = Get-Content -LiteralPath $runSettingsPath -Raw | ConvertFrom-Json
+        if (!$runSettings.properties.PSObject.Properties['open_powerlauncher']) {
+            $runSettings.properties | Add-Member -NotePropertyName open_powerlauncher -NotePropertyValue ([pscustomobject]@{})
+        }
+        $runSettings.properties.open_powerlauncher.win = $true
+        $runSettings.properties.open_powerlauncher.ctrl = $false
+        $runSettings.properties.open_powerlauncher.alt = $true
+        $runSettings.properties.open_powerlauncher.shift = $false
+        $runSettings.properties.open_powerlauncher.code = 83
+        $runSettings.properties.open_powerlauncher.key = ''
+        $runSettings.properties.hotkey_changed = $true
+        $runSettings.properties.override_win_s_key = $true
+        $runSettings | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $runSettingsPath -Encoding UTF8
+        Write-Host 'Configured PowerToys Run: Win+S override and Win+Alt+S hotkey'
+    }
+
+    $legacyRunSettingsPath = Join-Path $env:LOCALAPPDATA 'MicrosoftPowerToysPowerToys RunSettingsPowerToysRunSettings.json'
+    if (Test-Path -LiteralPath $legacyRunSettingsPath) {
+        $legacyRunSettings = Get-Content -LiteralPath $legacyRunSettingsPath -Raw | ConvertFrom-Json
+        $legacyRunSettings.Hotkey = 'Win + Alt + S'
+        $legacyRunSettings | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $legacyRunSettingsPath -Encoding UTF8
+    }
 
     $powerToysExe = 'C:\Program Files\PowerToys\PowerToys.exe'
     if (Test-Path -LiteralPath $powerToysExe) {
@@ -383,38 +534,6 @@ $staleWinShotXShortcut = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\St
 if (Test-Path -LiteralPath $staleWinShotXShortcut) {
     Remove-Item -LiteralPath $staleWinShotXShortcut -Force
     Write-Host 'Removed stale WinShotX startup shortcut'
-}
-
-# ---- (unchanged) Windows Terminal font ----
-$terminalSettings = @(
-    (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),
-    (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json')
-)
-foreach ($settingsPath in $terminalSettings) {
-    if (!(Test-Path -LiteralPath $settingsPath)) { continue }
-
-    $settingsText = Get-Content -LiteralPath $settingsPath -Raw
-    $updatedSettings = $settingsText
-    if ($updatedSettings -match '"fontFace"\s*:') {
-        $fontPattern = [regex]::new('"fontFace"\s*:\s*"(?:\\.|[^"\\])*"')
-        $updatedSettings = $fontPattern.Replace(
-            $updatedSettings,
-            '"fontFace": "JetBrainsMono Nerd Font"',
-            1)
-    }
-    elseif ($updatedSettings -match '"defaults"\s*:\s*\{') {
-        $defaultsPattern = [regex]::new('"defaults"\s*:\s*\{')
-        $updatedSettings = $defaultsPattern.Replace(
-            $updatedSettings,
-            '"defaults": { "fontFace": "JetBrainsMono Nerd Font",',
-            1)
-    }
-
-    if ($updatedSettings -ne $settingsText) {
-        Copy-Item -LiteralPath $settingsPath -Destination "$settingsPath.bak" -Force
-        Set-Content -LiteralPath $settingsPath -Value $updatedSettings -Encoding UTF8
-        Write-Host "Configured Windows Terminal font: $settingsPath"
-    }
 }
 
 # ---- (unchanged) PowerShell modules ----

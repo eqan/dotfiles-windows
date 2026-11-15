@@ -393,7 +393,7 @@ Action<IConfigContext> doConfig = (context) =>
     context.WorkspaceContainer.CreateWorkspaces("1", "2", "3", "4", "5", "6", "7", "8", "9");
 
     // Keybindings
-    var modKey = KeyModifiers.Alt;
+    var modKey = KeyModifiers.LAlt;
     IKeybindManager manager = context.Keybinds;
     manager.UnsubscribeAll();
 
@@ -449,11 +449,8 @@ Action<IConfigContext> doConfig = (context) =>
     // Replace any built-in Alt+C assignment with one close action
     // Replace any built-in Alt+C assignment with one close action
     // Replace any built-in Alt+C assignment with one close action
-    // Alt+Space cycles through the configured layout engines
+    // Win+Space cycles through the configured layout engines
     // Replace any built-in Alt+C assignment with one close action
-    // Replace any built-in Alt+C assignment with one close action
-    context.Keybinds.Unsubscribe(KeyModifiers.Alt, workspacer.Keys.C);
-    context.Keybinds.Subscribe(KeyModifiers.Alt, workspacer.Keys.C, () => context.WorkspaceContainer.GetWorkspaceForMonitor(context.MonitorContainer.FocusedMonitor).CloseFocusedWindow(), "close focused window");
 };
 
 return doConfig;
