@@ -132,6 +132,81 @@ function Set-SecurityOnlyWindowsUpdates {
 
 Set-SecurityOnlyWindowsUpdates
 
+function Apply-LightweightWindowsDebloat {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+    if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        throw 'Service and scheduled-task debloat requires an Administrator PowerShell session.'
+    }
+
+    # Optional services only. They remain available on demand because Manual is used,
+    # rather than permanently disabling the service.
+    $optionalServices = @(
+        'WSearch',          # Everything/Flow replaces Windows Search indexing
+        'cbdhsvc*',         # Ditto replaces Windows Clipboard User Service
+        'Spooler',          # Enable manually when printing is needed
+        'LanmanServer',     # Enable manually when sharing files/printers
+        'TrkWks',           # Legacy distributed-link tracking
+        'IpOverUsbSvc',     # Windows Phone/USB development transport
+        'CDPSvc',           # Connected Devices Platform
+        'CDPUserSvc',       # Connected Devices per-user service prefix
+        'SysMain',          # Optional prefetch/caching service
+        'InventorySvc',     # Compatibility appraisal and inventory telemetry
+        'whesvc',           # Windows health/usage experience telemetry
+        'PcaSvc'            # Program Compatibility Assistant
+    )
+
+    foreach ($serviceName in $optionalServices) {
+        Get-Service -Name $serviceName -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                try {
+                    Set-Service -Name $_.Name -StartupType Manual -ErrorAction Stop
+                    if ($_.Status -eq 'Running') {
+                        Stop-Service -Name $_.Name -Force -ErrorAction SilentlyContinue
+                    }
+                    Write-Host "Set optional service to Manual: $($_.Name)"
+                }
+                catch {
+                    Write-Warning "Could not adjust service $($_.Name): $($_.Exception.Message)"
+                }
+            }
+    }
+
+    # Nonessential telemetry, feedback, Maps, and Xbox maintenance tasks.
+    $optionalTasks = @(
+        @{ Path = '\Microsoft\Windows\Application Experience\'; Name = 'Microsoft Compatibility Appraiser' },
+        @{ Path = '\Microsoft\Windows\Customer Experience Improvement Program\'; Name = 'Consolidator' },
+        @{ Path = '\Microsoft\Windows\Customer Experience Improvement Program\'; Name = 'UsbCeip' },
+        @{ Path = '\Microsoft\Windows\Feedback\Siuf\'; Name = 'DmClient' },
+        @{ Path = '\Microsoft\Windows\Feedback\Siuf\'; Name = 'DmClientOnScenarioDownload' },
+        @{ Path = '\Microsoft\Windows\Application Experience\'; Name = 'Microsoft Compatibility Appraiser Exp' },
+        @{ Path = '\Microsoft\Windows\Flighting\FeatureConfig\'; Name = 'GovernedFeatureUsageProcessing' },
+        @{ Path = '\Microsoft\Windows\Flighting\FeatureConfig\'; Name = 'UsageDataFlushing' },
+        @{ Path = '\Microsoft\Windows\Flighting\FeatureConfig\'; Name = 'UsageDataReceiver' },
+        @{ Path = '\Microsoft\Windows\Flighting\FeatureConfig\'; Name = 'UsageDataReporting' },
+        @{ Path = '\Microsoft\Windows\PerformanceTrace\'; Name = 'ShowFeedbackToast' },
+        @{ Path = '\Microsoft\Windows\PerformanceTrace\'; Name = 'WhesvcToast' },
+        @{ Path = '\Microsoft\Windows\Sustainability\'; Name = 'SustainabilityTelemetry' },
+        @{ Path = '\Microsoft\Windows\Maps\'; Name = 'MapsToastTask' },
+        @{ Path = '\Microsoft\Windows\Maps\'; Name = 'MapsUpdateTask' },
+        @{ Path = '\Microsoft\XblGameSave\'; Name = 'XblGameSaveTask' }
+    )
+
+    foreach ($task in $optionalTasks) {
+        try {
+            if (Get-ScheduledTask -TaskPath $task.Path -TaskName $task.Name -ErrorAction SilentlyContinue) {
+                Disable-ScheduledTask -TaskPath $task.Path -TaskName $task.Name -ErrorAction Stop | Out-Null
+                Write-Host "Disabled optional task: $($task.Path)$($task.Name)"
+            }
+        }
+        catch {
+            Write-Warning "Could not disable task $($task.Path)$($task.Name): $($_.Exception.Message)"
+        }
+    }
+}
+
+Apply-LightweightWindowsDebloat
+
 function Remove-ReplacedWindowsScreenshotApp {
     $snippingTool = Get-AppxPackage -Name Microsoft.ScreenSketch -ErrorAction SilentlyContinue
     if ($snippingTool) {
@@ -166,7 +241,8 @@ Remove-ReplacedWindowsTerminal
 $packages = @(
     'Microsoft.PowerShell',
     'Neovim.Neovim',
-    'Microsoft.PowerToys',
+    'voidtools.Everything',
+    'Flow-Launcher.Flow-Launcher',
     'Flameshot.Flameshot',
     'ArtifexSoftware.mutool',
     'VideoLAN.VLC',
@@ -191,6 +267,24 @@ $packages = @(
 foreach ($package in $packages) {
     Install-WingetPackage $package
 }
+
+# ---- Spotlight-style Flow Launcher configuration ----
+$flowSettings = Join-Path $env:APPDATA 'FlowLauncher\Settings\Settings.json'
+$flowExplorerSettings = Join-Path $env:APPDATA 'FlowLauncher\Settings\Plugins\Flow.Launcher.Plugin.Explorer\Settings.json'
+if (Test-Path -LiteralPath $flowSettings) {
+    $flow = Get-Content -LiteralPath $flowSettings -Raw | ConvertFrom-Json
+    $flow.Hotkey = 'Ctrl + Alt + S'
+    $flow.StartFlowLauncherOnSystemStartup = $true
+    $flow.UseLogonTaskForStartup = $true
+    $flow | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $flowSettings -Encoding UTF8
+}
+if (Test-Path -LiteralPath $flowExplorerSettings) {
+    $flowExplorer = Get-Content -LiteralPath $flowExplorerSettings -Raw | ConvertFrom-Json
+    $flowExplorer.EverythingInstalledPath = 'C:\Program Files\Everything\Everything.exe'
+    $flowExplorer.EverythingEnabled = $true
+    $flowExplorer | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $flowExplorerSettings -Encoding UTF8
+}
+Write-Host 'Configured Flow Launcher as the Spotlight-style Win+S search overlay.'
 
 # ---- lightweight screenshot capture ----
 $flameshotExe = 'C:\Program Files\Flameshot\bin\flameshot.exe'
@@ -264,9 +358,9 @@ function Install-WindowsAutomationVim {
             '(?m)^\s*Run \*RunAs wt, , max\s*$',
             '  Run *RunAs "C:\Program Files\WezTerm\wezterm-gui.exe", , max')
         if ($updatedCustomText -notmatch '(?m)^#s::\s*$') {
-            $updatedCustomText = '; Open PowerToys search from Win+S without invoking Windows Search.' +
+            $updatedCustomText = '; Open Flow Launcher through its Ctrl+Alt+S hotkey.' +
                 [Environment]::NewLine + '#s::' + [Environment]::NewLine +
-                '  Send, #!s' + [Environment]::NewLine + 'Return' +
+                '  Send, ^!s' + [Environment]::NewLine + 'Return' +
                 [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
         }
         if ($updatedCustomText -notmatch '(?m)^#\+s::\s*$') {
@@ -327,7 +421,7 @@ function Install-WindowsAutomationVim {
         $updatedCustomText = $updatedCustomText -replace '(?ms); Suppress standalone Windows-key presses while preserving Win\+key shortcuts\.\r?\n\$LWin::\r?\n\s*KeyWait, LWin\r?\nReturn\r?\n\r?\n\$RWin::\r?\n\s*KeyWait, RWin\r?\nReturn\r?\n\r?\n', ''
         if ($updatedCustomText -ne $customText) {
             Set-Content -LiteralPath $customCommands -Value $updatedCustomText -Encoding UTF8
-            Write-Host 'Configured AutoHotkey Win+X for WezTerm and Win+S for PowerToys search.'
+            Write-Host 'Configured AutoHotkey Win+X for WezTerm and Win+S for Flow Launcher.'
         }
     }
 
@@ -473,7 +567,21 @@ function Configure-PowerToysRemaps {
     }
 }
 
+# PowerToys has been replaced by Flow Launcher, Everything, Flameshot, Workspacer,
+# and AutoHotkey. Keep this compatibility function as a no-op for older checkouts.
+function Configure-PowerToysRemaps {
+    Write-Host 'Skipping PowerToys configuration; the lightweight replacements are active.'
+}
+
+if ((winget list --id Microsoft.PowerToys --exact --source winget --accept-source-agreements 2>$null | Out-String) -match 'Microsoft\.PowerToys') {
+    Write-Host 'Removing Microsoft PowerToys; its active features are replaced by Everything, Flameshot, Workspacer, and AHK.'
+    & winget uninstall --id Microsoft.PowerToys --exact --source winget --silent --accept-source-agreements
+}
+
 Configure-PowerToysRemaps
+
+# Remove the old elevated PowerToys startup task if it exists.
+Unregister-ScheduledTask -TaskName 'PowerToys (elevated)' -Confirm:$false -ErrorAction SilentlyContinue
 
 # ---- Workspacer startup is registered as an elevated scheduled task ----
 $workspacerStartupShortcut = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup') 'workspacer-dotfiles.lnk'
