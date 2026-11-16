@@ -778,8 +778,28 @@ Return
             $updatedCustomText = $dittoBinding + [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
         }
         $updatedCustomText = $updatedCustomText -replace '(?ms); Close the Start/menu overlay for a standalone Win press without intercepting Win\+key combinations\.?\r?\n~LWin Up::.*?Return\r?\n\r?\n~RWin Up::.*?Return\r?\n\r?\n', ''
-        $updatedCustomText = $updatedCustomText -replace '(?ms); Function to Call the live draw\r?\n#o::\r?\n\s*Run,"C:\\Program Files\\workspacer\\workspacer\.exe"\r?\nreturn', '; Start komorebi and its built-in bar without opening a console window.' + [Environment]::NewLine + '#o::' + [Environment]::NewLine + '  Run, "C:\\Program Files\\komorebi\\bin\\komorebic.exe" start --whkd --bar,, Hide' + [Environment]::NewLine + 'return'
-        $updatedCustomText = $updatedCustomText -replace '(?ms); (?:Start|Restart) komorebi.*?\r?\n#o::\r?\n\s*Run, "C:\\Program Files\\komorebi\\bin\\komorebic\.exe" start --whkd --bar,, Hide\r?\nreturn', '; Restart the complete elevated Komorebi stack without opening a console window.' + [Environment]::NewLine + '#o::' + [Environment]::NewLine + '  Run, powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\\Users\\eqan\\.config\\dotfiles-windows\\komorebi\\restart-komorebi.ps1", , Hide' + [Environment]::NewLine + 'return'
+        $komorebiStartBinding = @'
+; Start komorebi and its built-in bar without opening a console window.
+#o::
+  Run, "C:\Program Files\komorebi\bin\komorebic.exe" start --whkd --bar,, Hide
+return
+'@
+        $komorebiRestartBinding = @'
+; Restart the complete elevated Komorebi stack without opening a console window.
+#o::
+  Run, powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\eqan\.config\dotfiles-windows\komorebi\restart-komorebi.ps1", , Hide
+return
+'@
+        $updatedCustomText = [regex]::Replace(
+            $updatedCustomText,
+            '(?ms); Function to Call the live draw\r?\n#o::\r?\n\s*Run,"C:\\Program Files\\workspacer\\workspacer\.exe"\r?\nreturn',
+            $komorebiStartBinding
+        )
+        $updatedCustomText = [regex]::Replace(
+            $updatedCustomText,
+            '(?ms); (?:Start|Restart) komorebi.*?\r?\n#o::\r?\n\s*Run, "C:\\Program Files\\komorebi\\bin\\komorebic\.exe" start --whkd --bar,, Hide\r?\nreturn',
+            $komorebiRestartBinding
+        )
         if ($false) {
             $standaloneWinMask = '; Suppress Start for a standalone Win press while preserving Win+key shortcuts.' +
                 [Environment]::NewLine + '; The original Win events are blocked, then re-emitted so Workspacer still' +

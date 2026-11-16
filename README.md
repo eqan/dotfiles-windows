@@ -1,158 +1,128 @@
-# Full Windows Bootstrapping
+# Lightweight Windows bootstrap
 
-This repository bootstraps a complete Windows workstation: PowerShell,
-terminal tools, komorebi, Vim-style AutoHotkey controls, search,
-fonts, profiles, and startup tasks.
+This repository sets up a Windows workstation with **small, fast programs** instead of
+the default Microsoft apps and heavier suites. The installer prefers native binaries
+and portable tools: a Rust tiling window manager, a Rust terminal, a Vim layer, and
+focused replacements for search, screenshots, photos, and media.
+
+It is not a Workspacer, PowerToys, or Flow Launcher setup. Those programs, along with
+YASB, Brave, WinShotX, Windows Terminal, Photos, and Snipping Tool, are removed when
+present.
+
+![Demo of the bootstrapped Windows desktop](demo.png)
+
+## Current programs
+
+| Role | Program |
+| --- | --- |
+| Tiling window manager and bar | [komorebi](https://github.com/LGUG2Z/komorebi) + `whkd` |
+| Vim keys outside the terminal | [Windows-Automation](https://github.com/eqan/Windows-Automation) (`vim_ahk`) |
+| Terminal | [WezTerm](https://wezfurlong.org/wezterm/) + PowerShell 7 |
+| Editor | Neovim |
+| Spotlight-style search | [Keypirinha](https://keypirinha.com/) + [Everything](https://www.voidtools.com/) |
+| Clipboard history | Ditto |
+| Screenshots | Flameshot |
+| Image viewer | [ImageGlass](https://imageglass.org/) (WinUI3 Dark, Mica) |
+| Browser | Zen Browser |
+| Media / archives / PDF text | VLC, 7-Zip, MuPDF (`mutool`) |
+| File manager | `lf` (ranger-style), with Yazi available |
+| Unix-style CLI | Microsoft Coreutils, eza, zoxide, ripgrep, fd, fzf, bat, jq, Git, GitHub CLI |
+| Font | JetBrainsMono Nerd Font |
+
+The PowerShell profile uses PSReadLine's native Vi prompt. It does not load oh-my-posh,
+`posh-git`, or Terminal-Icons at startup.
+
+## Replaced software
+
+The bootstrap uninstalls leftovers and switches the workflow to the programs above:
+
+| Removed | Replacement |
+| --- | --- |
+| Workspacer | komorebi |
+| YASB | komorebi built-in bar |
+| PowerToys | Keypirinha, Everything, Flameshot, komorebi, Vim AHK |
+| Flow Launcher | Keypirinha |
+| Windows Photos | ImageGlass |
+| Snipping Tool | Flameshot |
+| Windows Terminal | WezTerm |
+| WinShotX | Flameshot |
+| Brave | Zen Browser |
 
 ## One-command installation
 
-Open **Administrator PowerShell** in this repository and run one command:
+Open **Administrator PowerShell** in this repository and run:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\install.ps1"
 ```
 
-![Demo of the bootstrapped Windows desktop](demo.png)
-Picture1.png
-The installer:
+The installer also:
 
-- Sets `WORKSPACER_CONFIG` to this repository
-- Installs PowerShell 7
-- Installs komorebi and whkd for lightweight Rust-based tiling and Alt-key controls
-- Installs Artifex's MuPDF toolkit (`mutool`), VLC, 7-Zip, Zen Browser, and ImageGlass
-- Removes the per-user Windows Photos packages and registers ImageGlass as the default viewer, with the WinUI3 Dark theme and Mica backdrop
-- Includes an optional Chris Titus Tech WinUtil Minimal debloat step; the current
-  machine is marked as already debloated so rerunning setup does not repeat it
-- Configures WinUtil-style Security updates only: feature updates are deferred,
-  driver delivery through Windows Update is disabled, and updates notify before install
-- At the start, optionally enables battery C-state-friendly power settings: processor
-  idle and core parking, 5% minimum battery processor state, and maximum PCIe ASPM
-- Installs AutoHotkey v1.1.37.02 for the repository's Vim AHK configuration
-- Installs PSReadLine; the profile uses a minimal native prompt with no prompt framework,
-  `posh-git`, or `Terminal-Icons` startup dependency
-- Installs WezTerm, a Rust terminal emulator with tabs and panes, configured to launch
-  PowerShell 7 by default
-- Installs native Unix-oriented tools: eza, zoxide, and Yazi, alongside Microsoft Coreutils
-- Installs Ditto for clipboard history and starts Ditto in the background at logon
-- Installs JetBrainsMono Nerd Font for prompt icons and configures Windows Terminal to use it
-- Installs Microsoft Coreutils (`cat`, `grep`, `find`, `xargs`, and related Unix-style commands)
-- Installs `lf`, `ripgrep`, `fd`, `fzf`, `bat`, `jq`, Git, and GitHub CLI
-- Configures `lf` with a ranger-style dark theme, Nerd Font icons, previews, Windows file associations,
-  ImageGlass for images, VLC media opening, and Neovim editing for text, Markdown, LaTeX, and source files
-- Detects the repository's `nircmd` files
-- Configures komorebi's built-in bar with workspace numbers, layout, focused title,
-  CPU, storage, memory, network, battery, date, and time widgets
-- Configures the native Windows taskbar to persistent auto-hide so only komorebi-bar
-  remains visible during normal use
-- Hides desktop icons by default; `Ctrl+Alt+D` in Vim AHK toggles them for temporary access
-- Builds `vim_ahk.exe` from `eqan/Windows-Automation`
-- Configures Vim AHK `Win+X` to launch elevated WezTerm instead of Windows Terminal
-- Registers komorebi and Vim AHK as elevated startup tasks with a three-second delay
-- Cleans up stale `whkd` instances before starting the elevated Komorebi hotkey daemon
-- Uses the committed `komorebi/` configuration and disables the old Workspacer startup task
-- Removes replaced applications such as Workspacer, YASB, PowerToys, Flow Launcher,
-  Brave, and WinShotX when they are still installed
-- Starts komorebi, its built-in bar, whkd, and Vim AHK with the committed configuration
-- Starts Everything with `-startup` and Ditto as hidden background tray utilities; neither opens a window at logon
+- Optionally applies battery C-state-friendly power settings at the start
+- Optionally runs Chris Titus Tech WinUtil **Minimal** debloat when `$windowsAlreadyDebloated` is `$false`
+- Applies WinUtil-style Security Windows Update policy (feature updates deferred, drivers off, notify before install)
+- Auto-hides the Windows taskbar so only komorebi-bar stays visible
+- Hides desktop icons by default (`Ctrl+Alt+D` in Vim AHK toggles them)
+- Registers komorebi and Vim AHK as elevated logon tasks
+- Starts Everything and Ditto hidden in the tray
+- Registers ImageGlass as the default photo viewer
 
-## Manual start
-
-```powershell
-& "C:\Program Files\komorebi\bin\komorebic.exe" start
-```
+## Desktop controls
 
 komorebi uses `Alt` as its modifier: `Alt+H/J/K/L` moves focus, `Alt+Shift+H/L`
 shrinks/expands the primary column, `Alt+Shift+J/K` adjusts vertical sizing,
 `Alt+1..9` switches workspaces, and `Alt+Space` cycles layouts. Window movement
 uses `Ctrl+Alt+H/J/K/L` so it does not conflict with resizing.
-`Alt+C` and `Alt+Q` close the focused window. The built-in bar shows workspace numbers,
-layout, focused title, CPU, storage, memory, network, battery, a compact date, and time.
+`Alt+C` and `Alt+Q` close the focused window.
 
-If the hotkeys become unresponsive, press `Win+O` or run
-`powershell -File .\komorebi\restart-komorebi.ps1`. This releases stuck modifier state,
-cleans stale Komorebi/whkd processes, and restarts the single elevated stack.
+If hotkeys become unresponsive, press `Win+O` or run
+`powershell -File .\komorebi\restart-komorebi.ps1`.
 
-PowerShell shortcuts include `vim-ahk` to enter the Windows-Automation checkout and
-`dotfiles` to enter this repository. Tab accepts an inline history suggestion; when
-no suggestion exists, it opens normal command and file completion.
+Manual start:
 
-PowerShell uses PSReadLine's native Vi editing mode. Vim AHK remains available for
-other applications but is explicitly disabled inside WezTerm.
+```powershell
+& "C:\Program Files\komorebi\bin\komorebic.exe" start
+```
 
-The installer backs up and updates Windows Terminal's `settings.json` to use **JetBrainsMono Nerd Font**. Restart Windows Terminal after setup so the font change takes effect.
+## Search, screenshots, and files
 
-Flameshot is the lightweight screenshot replacement. The bootstrap removes the
-per-user Microsoft Snipping Tool package. WezTerm is the terminal replacement;
-the bootstrap also removes the per-user Windows Terminal package when present.
-Flameshot supports region,
-window, fullscreen, clipboard, annotation, blur, and export workflows without
-the larger ShareX suite. `Win+Shift+S` starts region capture and copies the
-result to the clipboard; the bootstrap republishes the image without
-Flameshot's clipboard-manager ignore marker so Ditto records it in history.
-Flameshot is started automatically at logon.
+- **Keypirinha** is `Ctrl+Alt+S`; Vim AHK forwards `Win+S` to it. File search uses the
+  already-running Everything index.
+- **Flameshot** is `Win+Shift+S` region capture to the clipboard. The installer
+  republishes the image so Ditto records it. Flameshot starts at logon.
+- **ImageGlass** opens images from Explorer and `lf`, with the WinUI3 Dark theme.
+- **`lf`** uses a ranger-style dark theme: Neovim for text, ImageGlass for images,
+  VLC for media.
 
-ImageGlass is the lightweight image-viewer replacement. The bootstrap removes the
-per-user Microsoft Photos packages and registers ImageGlass as the default viewer
-through ImageGlass's own `--ig-set-default-viewer` command. It installs Mizan's
-[WinUI3 Dark](https://imageglass.org/themes/winui3-dark-mizan-53) theme pack,
-points both dark and light modes at that pack, and uses a Mica window backdrop so
-the viewer stays close to Windows 11 dark WinUI. `lf` opens common image formats
-in ImageGlass.
+PowerShell aliases: `vim-ahk` enters the Windows-Automation checkout, `dotfiles`
+enters this repository. Tab accepts an inline history suggestion, or opens completion
+when none exists. Vim AHK is disabled inside WezTerm.
 
-Keypirinha is the lightweight Spotlight-style search replacement. Its explicit
-shortcut is `Ctrl+Alt+S`, and Vim AHK forwards `Win+S` to it. Its built-in
-Everything package uses the already-running Everything index for fast file and
-application search. Flow Launcher is disabled and is no longer installed by the
-bootstrap.
+Windows still protects some file associations. If a type stays bound to another app,
+set ImageGlass, VLC, Zen Browser, and your PDF handler in
+**Settings → Apps → Default apps**.
 
-## Debloating and default applications
+## Debloating and battery
 
-The installer uses the official [Chris Titus Tech Windows Utility](https://christitus.com/windows-tool)
-headlessly with its `Minimal` preset only when `$windowsAlreadyDebloated` in
-`install.ps1` is set to `$false`. It is currently `$true` because this system has
-already been debloated. The Minimal preset includes WinUtil's essential telemetry
-protection and service/privacy settings. WinUtil requires an elevated PowerShell session.
+WinUtil Minimal runs only when `$windowsAlreadyDebloated` in `install.ps1` is `$false`.
+It is currently `$true` on this machine. See the
+[Chris Titus Tech Windows Utility](https://christitus.com/windows-tool).
 
-The installer also applies WinUtil's documented **Security** Windows Update workflow:
-feature updates are deferred for 365 days, quality updates for 4 days, driver delivery
-through Windows Update is disabled, and Windows notifies before installation. Windows
-Update remains enabled so security updates can still arrive.
-
-### Battery C-state optimization
-
-The bootstrap asks whether to apply the optional battery optimization near startup.
-Answer `y` or `yes` to configure the active power plan with processor idle enabled,
-core parking allowed, a 5% minimum processor state on battery, and maximum PCIe
-link-state power savings. Answering anything else skips it. These settings allow
-deeper idle states but cannot force a particular C-state; CPU firmware, drivers, and
-active devices determine the final residency.
-
-WinGet installs VLC, 7-Zip, Zen Browser, ImageGlass, and Artifex's MuPDF command-line toolkit
-(`mutool`). ImageGlass is registered as the default photo viewer through its supported
-command-line helper. Windows still protects some associations; if a format stays bound
-to another app, set ImageGlass, VLC, Zen Browser, and your preferred PDF handler in
-**Settings → Apps → Default apps** after installation.
+The optional battery prompt enables processor idle, core parking, a 5% minimum
+processor state on battery, and maximum PCIe ASPM. Firmware still decides the actual
+C-state.
 
 ## Vim AHK
 
-The installer downloads and builds the [Windows-Automation](https://github.com/eqan/Windows-Automation) Vim AHK project. It starts the compiled `vim_ahk.exe` through an elevated scheduled task at logon.
+The installer clones and builds [Windows-Automation](https://github.com/eqan/Windows-Automation).
+`Win+X` launches elevated WezTerm. Zen Browser is excluded from Vim AHK; Normal mode
+blocks ordinary text input while preserving Vim bindings.
 
-After changing the Vim AHK source, refresh it with:
+After changing the source:
 
 ```powershell
 . $PROFILE
 vim-refresh
 ```
 
-Use `vim-refresh -NoPull` to rebuild the existing checkout without pulling from GitHub. Windows Terminal and Zen Browser are excluded from Vim AHK, and Normal mode blocks ordinary text input while preserving Vim bindings.
-
-WinShotX is not installed or started by this setup. Flameshot handles
-`Win+Shift+S` region capture and copies the result to the clipboard. The
-installer removes old WinShotX remnants.
-
-## Commit changes
-
-```powershell
-git add README.md .workspacer komorebi install.ps1
-git commit -m "Add lightweight komorebi desktop setup"
-```
+Use `vim-refresh -NoPull` to rebuild without pulling from GitHub.
