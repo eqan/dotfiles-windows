@@ -1,7 +1,7 @@
 # Full Windows Bootstrapping
 
 This repository bootstraps a complete Windows workstation: PowerShell,
-terminal tools, Workspacer, PowerToys, Vim-style AutoHotkey controls, search,
+terminal tools, komorebi, Vim-style AutoHotkey controls, search,
 fonts, profiles, and startup tasks.
 
 ## One-command installation
@@ -16,7 +16,7 @@ The installer:
 
 - Sets `WORKSPACER_CONFIG` to this repository
 - Installs PowerShell 7
-- Installs Microsoft PowerToys for keyboard remapping
+- Installs komorebi and whkd for lightweight Rust-based tiling and Alt-key controls
 - Installs Artifex's MuPDF toolkit (`mutool`), VLC, 7-Zip, and Zen Browser
 - Includes an optional Chris Titus Tech WinUtil Minimal debloat step; the current
   machine is marked as already debloated so rerunning setup does not repeat it
@@ -34,24 +34,36 @@ The installer:
 - Installs Microsoft Coreutils (`cat`, `grep`, `find`, `xargs`, and related Unix-style commands)
 - Installs `lf`, `ripgrep`, `fd`, `fzf`, `bat`, `jq`, Git, and GitHub CLI
 - Detects the repository's `nircmd` files
-- Installs Workspacer with WinGet (`rickbutton.workspacer`)
+- Configures komorebi's built-in bar with workspace numbers, layout, focused title,
+  CPU, storage, memory, network, battery, date, and time widgets
+- Configures the native Windows taskbar to persistent auto-hide so only komorebi-bar
+  remains visible during normal use
+- Hides desktop icons by default; `Ctrl+Alt+D` in Vim AHK toggles them for temporary access
 - Builds `vim_ahk.exe` from `eqan/Windows-Automation`
 - Configures Vim AHK `Win+X` to launch elevated WezTerm instead of Windows Terminal
-- Registers Workspacer and Vim AHK as elevated startup tasks with highest privileges
-- Uses this repository as the Workspacer configuration root
-- Starts Workspacer and Vim AHK with the committed configuration
+- Registers komorebi and Vim AHK as elevated startup tasks with a three-second delay
+- Cleans up stale `whkd` instances before starting the elevated Komorebi hotkey daemon
+- Uses the committed `komorebi/` configuration and disables the old Workspacer startup task
+- Removes replaced applications such as Workspacer, YASB, PowerToys, Flow Launcher,
+  Brave, and WinShotX when they are still installed
+- Starts komorebi, its built-in bar, whkd, and Vim AHK with the committed configuration
 
 ## Manual start
 
 ```powershell
-& ".\.workspacer\start-workspacer.cmd"
+& "C:\Program Files\komorebi\bin\komorebic.exe" start
 ```
 
-Workspacer now uses the left Windows key as its modifier: `Win+H/L` switches
-workspaces, `Win+J/K` changes focus, `Win+1..9` switches directly, and
-`Win+Space` cycles layouts. `Alt+C` remains the close-focused-window shortcut.
-The AHK layer suppresses the standalone Windows-key Start popup while passing
-Win combinations through to Workspacer.
+komorebi uses `Alt` as its modifier: `Alt+H/J/K/L` moves focus, `Alt+Shift+H/L`
+shrinks/expands the primary column, `Alt+Shift+J/K` adjusts vertical sizing,
+`Alt+1..9` switches workspaces, and `Alt+Space` cycles layouts. Window movement
+uses `Ctrl+Alt+H/J/K/L` so it does not conflict with resizing.
+`Alt+C` and `Alt+Q` close the focused window. The built-in bar shows workspace numbers,
+layout, focused title, CPU, storage, memory, network, battery, a compact date, and time.
+
+If the hotkeys become unresponsive, press `Win+O` or run
+`powershell -File .\komorebi\restart-komorebi.ps1`. This releases stuck modifier state,
+cleans stale Komorebi/whkd processes, and restarts the single elevated stack.
 
 PowerShell shortcuts include `vim-ahk` to enter the Windows-Automation checkout and
 `dotfiles` to enter this repository. Tab accepts an inline history suggestion; when
@@ -70,10 +82,11 @@ window, fullscreen, clipboard, annotation, blur, and export workflows without
 the larger ShareX suite. `Win+Shift+S` starts region capture and copies the
 result to the clipboard; Flameshot is started automatically at logon.
 
-PowerToys Run is the Windows Search replacement. Its explicit shortcut is
-`Win+Alt+S`, and the installer enables PowerToys Run's native `Win+S` override,
-so both combinations open the same search interface without competing global
-keyboard remaps.
+Keypirinha is the lightweight Spotlight-style search replacement. Its explicit
+shortcut is `Ctrl+Alt+S`, and Vim AHK forwards `Win+S` to it. Its built-in
+Everything package uses the already-running Everything index for fast file and
+application search. Flow Launcher is disabled and is no longer installed by the
+bootstrap.
 
 ## Debloating and default applications
 
@@ -116,13 +129,13 @@ vim-refresh
 
 Use `vim-refresh -NoPull` to rebuild the existing checkout without pulling from GitHub. Windows Terminal and Zen Browser are excluded from Vim AHK, and Normal mode blocks ordinary text input while preserving Vim bindings.
 
-WinShotX is not installed or started by this setup. Use Windows' built-in
-`Win+Shift+S` shortcut for Snipping Tool. The installer removes old
-WinShotX-related remaps and configures PowerToys Run to handle `Win+S` natively.
+WinShotX is not installed or started by this setup. Flameshot handles
+`Win+Shift+S` region capture and copies the result to the clipboard. The
+installer removes old WinShotX and PowerToys remnants.
 
 ## Commit changes
 
 ```powershell
-git add README.md .workspacer
-git commit -m "Add one-command Workspacer setup"
+git add README.md .workspacer komorebi install.ps1
+git commit -m "Add lightweight komorebi desktop setup"
 ```

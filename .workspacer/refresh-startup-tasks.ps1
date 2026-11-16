@@ -26,7 +26,17 @@ $vimPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactiv
 Register-ScheduledTask -TaskName 'AutoHotkey Vim (Windows-Automation)' -Action $vimAction `
     -Trigger $vimTrigger -Principal $vimPrincipal -Settings $settings -Force | Out-Null
 
-Get-Process workspacer,vim_ahk -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-ScheduledTask -TaskName 'Workspacer (elevated)'
+$komorebiLauncher = Join-Path $repoRoot 'komorebi\start-komorebi-hidden.vbs'
+$komorebiAction = New-ScheduledTaskAction -Execute $wscript `
+    -Argument "`"$komorebiLauncher`"" -WorkingDirectory $repoRoot
+$komorebiTrigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+$komorebiPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Highest
+Register-ScheduledTask -TaskName 'komorebi (elevated)' -Action $komorebiAction `
+    -Trigger $komorebiTrigger -Principal $komorebiPrincipal -Settings $settings -Force | Out-Null
+
+Get-Process workspacer,workspacer.Watcher,vim_ahk,komorebi,whkd,komorebi-bar -ErrorAction SilentlyContinue |
+    Stop-Process -Force -ErrorAction SilentlyContinue
+Disable-ScheduledTask -TaskName 'Workspacer (elevated)' -ErrorAction SilentlyContinue | Out-Null
+Start-ScheduledTask -TaskName 'komorebi (elevated)'
 Start-ScheduledTask -TaskName 'AutoHotkey Vim (Windows-Automation)'
-Write-Host 'Refreshed elevated interactive startup tasks with 3-second launch delays.'
+Write-Host 'Refreshed elevated komorebi and AutoHotkey startup tasks with 3-second launch delays.'

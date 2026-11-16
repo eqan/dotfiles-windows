@@ -1,7 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = $PSScriptRoot
-$workspacerInstaller = Join-Path $repoRoot '.workspacer\install-workspacer.ps1'
 
 if (!(Get-Command winget -ErrorAction SilentlyContinue)) {
     throw 'WinGet is unavailable. Install/update App Installer from Microsoft Store, then run this script again.'
@@ -71,6 +70,43 @@ function Install-WingetPackage {
         Write-Warning "WinGet could not install $Id (exit code $LASTEXITCODE); continuing."
     }
 }
+
+function Remove-ReplacedApplications {
+    $replacedPackages = @(
+        'rickbutton.workspacer',
+        'AmN.yasb',
+        'Microsoft.PowerToys',
+        'Flow-Launcher.Flow-Launcher',
+        'Brave.Brave',
+        'WinShotX.WinShotX'
+    )
+
+    foreach ($packageId in $replacedPackages) {
+        $installed = (& winget list --id $packageId --exact --source winget `
+            --accept-source-agreements 2>$null | Out-String)
+        if ($installed -match [regex]::Escape($packageId)) {
+            Write-Host "Removing replaced application $packageId..."
+            & winget uninstall --id $packageId --exact --source winget --silent `
+                --accept-source-agreements
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Could not remove $packageId (exit code $LASTEXITCODE). Run the bootstrap from Administrator PowerShell."
+            }
+        }
+    }
+
+    # Remove known PowerToys context-menu remnants if the package was previously removed.
+    Get-AppxPackage | Where-Object {
+        $_.Name -in @(
+            'Microsoft.PowerToys.FileLocksmithContextMenu',
+            'Microsoft.PowerToys.ImageResizerContextMenu',
+            'Microsoft.PowerToys.PowerRenameContextMenu'
+        )
+    } | ForEach-Object {
+        Remove-AppxPackage -Package $_.PackageFullName -ErrorAction SilentlyContinue
+    }
+}
+
+Remove-ReplacedApplications
 
 # Keep this true on machines that have already had the Windows cleanup applied.
 # Set it to $false on a fresh installation to run Chris Titus Tech's Minimal preset.
@@ -242,7 +278,8 @@ $packages = @(
     'Microsoft.PowerShell',
     'Neovim.Neovim',
     'voidtools.Everything',
-    'Flow-Launcher.Flow-Launcher',
+    'LGUG2Z.komorebi',
+    'LGUG2Z.whkd',
     'Flameshot.Flameshot',
     'ArtifexSoftware.mutool',
     'VideoLAN.VLC',
@@ -268,23 +305,147 @@ foreach ($package in $packages) {
     Install-WingetPackage $package
 }
 
-# ---- Spotlight-style Flow Launcher configuration ----
-$flowSettings = Join-Path $env:APPDATA 'FlowLauncher\Settings\Settings.json'
-$flowExplorerSettings = Join-Path $env:APPDATA 'FlowLauncher\Settings\Plugins\Flow.Launcher.Plugin.Explorer\Settings.json'
-if (Test-Path -LiteralPath $flowSettings) {
-    $flow = Get-Content -LiteralPath $flowSettings -Raw | ConvertFrom-Json
-    $flow.Hotkey = 'Ctrl + Alt + S'
-    $flow.StartFlowLauncherOnSystemStartup = $true
-    $flow.UseLogonTaskForStartup = $true
-    $flow | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $flowSettings -Encoding UTF8
+function Install-CodexCli {
+    $npm = Get-Command npm.exe -ErrorAction SilentlyContinue
+    if (!$npm) {
+        Write-Warning 'Skipping OpenAI Codex CLI because npm is not available.'
+        return
+    }
+
+    $npmPrefix = (& npm.exe prefix --global 2>$null | Select-Object -Last 1).Trim()
+    if (!$npmPrefix) {
+        throw 'Could not determine the npm global prefix for OpenAI Codex CLI.'
+    }
+
+    Write-Host 'Installing or updating OpenAI Codex CLI...'
+    & npm.exe install --global '@openai/codex@latest'
+    if ($LASTEXITCODE -ne 0) {
+        throw "OpenAI Codex CLI installation failed with exit code $LASTEXITCODE."
+    }
+
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $pathParts = @($userPath -split ';' | Where-Object { $_ })
+    if ($pathParts -notcontains $npmPrefix) {
+        [Environment]::SetEnvironmentVariable('Path', (($pathParts + $npmPrefix) -join ';'), 'User')
+    }
+    $env:Path = "$npmPrefix;$env:Path"
+
+    $codex = Get-Command codex.exe -ErrorAction SilentlyContinue
+    if (!$codex) {
+        throw 'OpenAI Codex CLI installed, but codex.exe was not found on PATH.'
+    }
+    Write-Host "OpenAI Codex CLI ready: $(& codex.exe --version)"
 }
-if (Test-Path -LiteralPath $flowExplorerSettings) {
-    $flowExplorer = Get-Content -LiteralPath $flowExplorerSettings -Raw | ConvertFrom-Json
-    $flowExplorer.EverythingInstalledPath = 'C:\Program Files\Everything\Everything.exe'
-    $flowExplorer.EverythingEnabled = $true
-    $flowExplorer | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $flowExplorerSettings -Encoding UTF8
+
+Install-CodexCli
+
+function Install-Keypirinha {
+    $keypirinhaRoot = Join-Path $env:LOCALAPPDATA 'Keypirinha'
+    $keypirinhaExe = Join-Path $keypirinhaRoot 'keypirinha.exe'
+    if (Test-Path -LiteralPath $keypirinhaExe) {
+        Write-Host 'Skipping Keypirinha (already installed).'
+        return
+    }
+    $archive = Join-Path $env:TEMP 'keypirinha-2.26-x64-portable.7z'
+    $url = 'https://github.com/Keypirinha/Keypirinha/releases/download/v2.26/keypirinha-2.26-x64-portable.7z'
+    $sevenZip = 'C:\Program Files\7-Zip\7z.exe'
+    if (!(Test-Path -LiteralPath $sevenZip)) { throw '7-Zip is required to install Keypirinha.' }
+    Write-Host 'Installing Keypirinha from the official portable release...'
+    Invoke-WebRequest -Uri $url -OutFile $archive
+    New-Item -ItemType Directory -Path $env:LOCALAPPDATA -Force | Out-Null
+    & $sevenZip x $archive "-o$env:LOCALAPPDATA" -y | Out-Null
+    if (!(Test-Path -LiteralPath $keypirinhaExe)) { throw 'Keypirinha extraction did not produce keypirinha.exe.' }
 }
-Write-Host 'Configured Flow Launcher as the Spotlight-style Win+S search overlay.'
+
+Install-Keypirinha
+
+# komorebi's native bar replaces YASB; remove an older YASB installation if present.
+if ((winget list --id AmN.yasb --exact --source winget --accept-source-agreements 2>$null | Out-String) -match 'AmN\.yasb') {
+    Write-Host 'Removing redundant YASB; komorebi-bar provides the status bar with fewer components.'
+    & winget uninstall --id AmN.yasb --exact --source winget --silent --accept-source-agreements
+}
+
+# ---- lightweight komorebi window-manager configuration ----
+function Install-KomorebiConfiguration {
+    $komorebiSource = Join-Path $repoRoot 'komorebi'
+    $komorebiTarget = Join-Path $env:USERPROFILE 'komorebi.json'
+    $barTarget = Join-Path $env:USERPROFILE 'komorebi.bar.json'
+    $applicationsTarget = Join-Path $env:USERPROFILE 'applications.json'
+    $whkdDirectory = Join-Path $env:USERPROFILE '.config'
+    $whkdTarget = Join-Path $whkdDirectory 'whkdrc'
+    $quickstart = 'C:\Program Files\komorebi\bin\komorebic.exe'
+
+    New-Item -ItemType Directory -Path $whkdDirectory -Force | Out-Null
+    if (!(Test-Path -LiteralPath $applicationsTarget) -and (Test-Path -LiteralPath $quickstart)) {
+        & $quickstart quickstart | Out-Null
+    }
+    Copy-Item -LiteralPath (Join-Path $komorebiSource 'komorebi.json') -Destination $komorebiTarget -Force
+    Copy-Item -LiteralPath (Join-Path $komorebiSource 'komorebi.bar.json') -Destination $barTarget -Force
+    Copy-Item -LiteralPath (Join-Path $komorebiSource 'whkdrc') -Destination $whkdTarget -Force
+    Write-Host "Configured komorebi, built-in bar, and whkd under $env:USERPROFILE."
+}
+
+Install-KomorebiConfiguration
+
+function Set-WindowsTaskbarAutoHide {
+    $taskbarKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3'
+    if (!(Test-Path -LiteralPath $taskbarKey)) {
+        Write-Warning 'Windows taskbar layout key was not found; leaving taskbar settings unchanged.'
+        return
+    }
+    $settings = (Get-ItemProperty -LiteralPath $taskbarKey -Name Settings).Settings
+    $settings[8] = 3
+    Set-ItemProperty -LiteralPath $taskbarKey -Name Settings -Value $settings
+    Get-Process explorer -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    Start-Process explorer.exe
+    Write-Host 'Configured the Windows taskbar to persistent auto-hide; komorebi-bar remains visible.'
+}
+
+Set-WindowsTaskbarAutoHide
+
+function Set-DesktopIconsHidden {
+    $desktopKey = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+    & reg.exe add $desktopKey /v HideIcons /t REG_DWORD /d 1 /f | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not hide desktop icons through the current-user registry.'
+    }
+    Write-Host 'Configured desktop icons to stay hidden; Ctrl+Alt+D toggles them in Vim AHK.'
+}
+
+Set-DesktopIconsHidden
+
+if (Test-Path -LiteralPath (Join-Path $repoRoot 'komorebi\restart-komorebi.ps1')) {
+    Write-Host 'Installed Komorebi recovery script: komorebi\restart-komorebi.ps1'
+}
+
+# ---- lightweight Spotlight-style Keypirinha configuration ----
+$keypirinhaRoot = Join-Path $env:LOCALAPPDATA 'Keypirinha'
+$keypirinhaExe = Join-Path $keypirinhaRoot 'keypirinha.exe'
+$keypirinhaUser = Join-Path $keypirinhaRoot 'portable\Profile\User'
+$keypirinhaConfig = Join-Path $repoRoot 'keypirinha\Keypirinha.ini'
+if (Test-Path -LiteralPath $keypirinhaExe) {
+    New-Item -ItemType Directory -Path $keypirinhaUser -Force | Out-Null
+    if (Test-Path -LiteralPath $keypirinhaConfig) {
+        Copy-Item -LiteralPath $keypirinhaConfig -Destination (Join-Path $keypirinhaUser 'Keypirinha.ini') -Force
+    }
+    $keypirinhaRunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+    New-Item -Path $keypirinhaRunKey -Force | Out-Null
+    Set-ItemProperty -Path $keypirinhaRunKey -Name Keypirinha -Value ('"' + $keypirinhaExe + '"')
+    if (Get-ScheduledTask -TaskName 'Flow.Launcher Startup' -ErrorAction SilentlyContinue) {
+        Disable-ScheduledTask -TaskName 'Flow.Launcher Startup' -ErrorAction SilentlyContinue | Out-Null
+    }
+    Get-Process Flow.Launcher,Flow -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $env:LOCALAPPDATA 'FlowLauncher') -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $env:APPDATA 'FlowLauncher') -Recurse -Force -ErrorAction SilentlyContinue
+    if (!(Get-Process keypirinha -ErrorAction SilentlyContinue)) {
+        Start-Process -FilePath $keypirinhaExe -WorkingDirectory $keypirinhaRoot
+    }
+    Write-Host 'Configured Keypirinha as the lightweight Spotlight-style Win+S search overlay; Everything is provided by its built-in plugin.'
+}
+else {
+    Write-Warning 'Keypirinha was not found under LocalAppData; install the official portable release before running the launcher setup.'
+}
 
 # ---- lightweight screenshot capture ----
 $flameshotExe = 'C:\Program Files\Flameshot\bin\flameshot.exe'
@@ -357,10 +518,17 @@ function Install-WindowsAutomationVim {
             $customText,
             '(?m)^\s*Run \*RunAs wt, , max\s*$',
             '  Run *RunAs "C:\Program Files\WezTerm\wezterm-gui.exe", , max')
+        $updatedCustomText = [regex]::Replace(
+            $updatedCustomText,
+            '(?ms); Open (?:Flow Launcher|Keypirinha).*?\r?\n#s::\r?\n\s*(?:Send, \^!s|Run, .*?--show,, Hide)\r?\nReturn',
+            '; Open Keypirinha directly; its built-in Everything package provides fast file search.' + [Environment]::NewLine +
+            '#s::' + [Environment]::NewLine +
+            '  Run, "C:\Users\eqan\AppData\Local\Keypirinha\keypirinha.exe" --show,, Hide' + [Environment]::NewLine +
+            'Return')
         if ($updatedCustomText -notmatch '(?m)^#s::\s*$') {
-            $updatedCustomText = '; Open Flow Launcher through its Ctrl+Alt+S hotkey.' +
+            $updatedCustomText = '; Open Keypirinha directly; its built-in Everything package provides fast file search.' +
                 [Environment]::NewLine + '#s::' + [Environment]::NewLine +
-                '  Send, ^!s' + [Environment]::NewLine + 'Return' +
+                '  Run, "C:\Users\eqan\AppData\Local\Keypirinha\keypirinha.exe" --show,, Hide' + [Environment]::NewLine + 'Return' +
                 [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
         }
         if ($updatedCustomText -notmatch '(?m)^#\+s::\s*$') {
@@ -369,11 +537,29 @@ function Install-WindowsAutomationVim {
                 '  Run, "C:\Program Files\Flameshot\bin\flameshot.exe" gui --clipboard,, Hide' + [Environment]::NewLine + 'Return' +
                 [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
         }
+        if ($updatedCustomText -notmatch '(?m)^\^!d::\s*$') {
+            $desktopToggle = '; Toggle desktop icons: hidden by default, reveal temporarily when needed.' +
+                [Environment]::NewLine + '^!d::' + [Environment]::NewLine +
+                '  RegRead, HideIcons, HKCU, Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced, HideIcons' +
+                [Environment]::NewLine +
+                '  if (HideIcons = 1)' + [Environment]::NewLine +
+                '    RegWrite, REG_DWORD, HKCU, Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced, HideIcons, 0' +
+                [Environment]::NewLine +
+                '  else' + [Environment]::NewLine +
+                '    RegWrite, REG_DWORD, HKCU, Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced, HideIcons, 1' +
+                [Environment]::NewLine +
+                '  DllCall("Shell32\SHChangeNotify", "UInt", 0x08000000, "UInt", 0, "Ptr", 0, "Ptr", 0)' +
+                [Environment]::NewLine + 'Return' + [Environment]::NewLine + [Environment]::NewLine
+            $updatedCustomText = $desktopToggle + $updatedCustomText
+        }
+        $updatedCustomText = $updatedCustomText -replace '(?ms); Close the focused komorebi window\.\r?\n!c::\r?\n\s*Run, "C:\\Program Files\\komorebi\\bin\\komorebic\.exe" close,, Hide\r?\nReturn\r?\n\r?\n', ''
         if ($updatedCustomText -notmatch '(?m)^#MenuMaskKey\s+') {
             # vkFF is documented as "no mapping" and avoids vk07, which newer Windows versions reserve.
             $updatedCustomText = '#MenuMaskKey vkFF' + [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
         }
         $updatedCustomText = $updatedCustomText -replace '(?ms); Close the Start/menu overlay for a standalone Win press without intercepting Win\+key combinations\.?\r?\n~LWin Up::.*?Return\r?\n\r?\n~RWin Up::.*?Return\r?\n\r?\n', ''
+        $updatedCustomText = $updatedCustomText -replace '(?ms); Function to Call the live draw\r?\n#o::\r?\n\s*Run,"C:\\Program Files\\workspacer\\workspacer\.exe"\r?\nreturn', '; Start komorebi and its built-in bar without opening a console window.' + [Environment]::NewLine + '#o::' + [Environment]::NewLine + '  Run, "C:\\Program Files\\komorebi\\bin\\komorebic.exe" start --whkd --bar,, Hide' + [Environment]::NewLine + 'return'
+        $updatedCustomText = $updatedCustomText -replace '(?ms); (?:Start|Restart) komorebi.*?\r?\n#o::\r?\n\s*Run, "C:\\Program Files\\komorebi\\bin\\komorebic\.exe" start --whkd --bar,, Hide\r?\nreturn', '; Restart the complete elevated Komorebi stack without opening a console window.' + [Environment]::NewLine + '#o::' + [Environment]::NewLine + '  Run, powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\\Users\\eqan\\.config\\dotfiles-windows\\komorebi\\restart-komorebi.ps1", , Hide' + [Environment]::NewLine + 'return'
         if ($false) {
             $standaloneWinMask = '; Suppress Start for a standalone Win press while preserving Win+key shortcuts.' +
                 [Environment]::NewLine + '; The original Win events are blocked, then re-emitted so Workspacer still' +
@@ -421,7 +607,7 @@ function Install-WindowsAutomationVim {
         $updatedCustomText = $updatedCustomText -replace '(?ms); Suppress standalone Windows-key presses while preserving Win\+key shortcuts\.\r?\n\$LWin::\r?\n\s*KeyWait, LWin\r?\nReturn\r?\n\r?\n\$RWin::\r?\n\s*KeyWait, RWin\r?\nReturn\r?\n\r?\n', ''
         if ($updatedCustomText -ne $customText) {
             Set-Content -LiteralPath $customCommands -Value $updatedCustomText -Encoding UTF8
-            Write-Host 'Configured AutoHotkey Win+X for WezTerm and Win+S for Flow Launcher.'
+            Write-Host 'Configured AutoHotkey Win+X for WezTerm and Win+S for Keypirinha.'
         }
     }
 
@@ -435,6 +621,12 @@ function Install-WindowsAutomationVim {
             Write-Host 'Configured Vim AHK to stay disabled in WezTerm.'
         }
     }
+
+    # Stop the elevated instance before rebuilding; otherwise vim_ahk.exe is locked
+    # and AutoHotkey silently leaves the previous binary running.
+    Stop-ScheduledTask -TaskName 'AutoHotkey Vim (Windows-Automation)' -ErrorAction SilentlyContinue
+    Get-Process vim_ahk -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
 
     if (!(Test-Path -LiteralPath $buildScript)) { throw "Windows-Automation build script not found: $buildScript" }
     Push-Location $automationRoot
@@ -567,7 +759,7 @@ function Configure-PowerToysRemaps {
     }
 }
 
-# PowerToys has been replaced by Flow Launcher, Everything, Flameshot, Workspacer,
+# PowerToys has been replaced by Keypirinha, Everything, Flameshot, komorebi,
 # and AutoHotkey. Keep this compatibility function as a no-op for older checkouts.
 function Configure-PowerToysRemaps {
     Write-Host 'Skipping PowerToys configuration; the lightweight replacements are active.'
@@ -576,6 +768,30 @@ function Configure-PowerToysRemaps {
 if ((winget list --id Microsoft.PowerToys --exact --source winget --accept-source-agreements 2>$null | Out-String) -match 'Microsoft\.PowerToys') {
     Write-Host 'Removing Microsoft PowerToys; its active features are replaced by Everything, Flameshot, Workspacer, and AHK.'
     & winget uninstall --id Microsoft.PowerToys --exact --source winget --silent --accept-source-agreements
+}
+
+# Remove PowerToys packaged context-menu extensions and per-user remnants too.
+$powerToysContextPackages = @(
+    'Microsoft.PowerToys.FileLocksmithContextMenu',
+    'Microsoft.PowerToys.ImageResizerContextMenu',
+    'Microsoft.PowerToys.PowerRenameContextMenu'
+)
+Get-AppxPackage | Where-Object { $_.Name -in $powerToysContextPackages } |
+    ForEach-Object { Remove-AppxPackage -Package $_.PackageFullName -ErrorAction SilentlyContinue }
+foreach ($powerToysKey in @(
+    'HKCU:\Software\Microsoft\PowerToys',
+    'HKCU:\Software\Classes\AllFileSystemObjects\ShellEx\ContextMenuHandlers\PowerRenameExt',
+    'HKCU:\Software\Classes\Directory\Background\shellex\ContextMenuHandlers\PowerRenameExt'
+)) {
+    Remove-Item -LiteralPath $powerToysKey -Recurse -Force -ErrorAction SilentlyContinue
+}
+foreach ($powerToysDirectory in @(
+    (Join-Path $env:LOCALAPPDATA 'PowerToys'),
+    (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys')
+)) {
+    if (Test-Path -LiteralPath $powerToysDirectory) {
+        try { [IO.Directory]::Delete($powerToysDirectory, $true) } catch { Write-Warning "Could not remove ${powerToysDirectory}: $($_.Exception.Message)" }
+    }
 }
 
 Configure-PowerToysRemaps
@@ -780,19 +996,40 @@ irm https://get.activated.win | iex
 Test-WindowsActivation
 
 # ============================================================
-# FIX 3: Workspacer is now initialized LAST, as a separate process.
-#        The bootstrap script no longer blocks on workspacer.
+# Komorebi is initialized last as an elevated scheduled task.
+# The legacy Workspacer task is disabled and removed from startup.
 # ============================================================
-if (Test-Path -LiteralPath $workspacerInstaller) {
-    Write-Host 'Initializing workspacer (separate process)...'
-    Start-Process -FilePath 'powershell.exe' `
-        -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',"`"$workspacerInstaller`"") `
-        -WorkingDirectory $repoRoot `
-        -NoNewWindow
-    Write-Host 'workspacer installer launched.'
+function Configure-KomorebiStartup {
+    $komorebiLauncher = Join-Path $repoRoot 'komorebi\start-komorebi-hidden.vbs'
+    $komorebiExe = 'C:\Program Files\komorebi\bin\komorebic.exe'
+    $whkdExe = 'C:\Program Files\whkd\bin\whkd.exe'
+    if (!(Test-Path -LiteralPath $komorebiLauncher) -or !(Test-Path -LiteralPath $komorebiExe)) {
+        throw 'Komorebi startup files were not found after installation.'
+    }
+
+    $legacyStartup = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup') 'workspacer-dotfiles.lnk'
+    Remove-Item -LiteralPath $legacyStartup -Force -ErrorAction SilentlyContinue
+    Disable-ScheduledTask -TaskName 'Workspacer (elevated)' -ErrorAction SilentlyContinue | Out-Null
+    Unregister-ScheduledTask -TaskName 'Workspacer (elevated)' -Confirm:$false -ErrorAction SilentlyContinue
+
+    $userId = "$env:USERDOMAIN\$env:USERNAME"
+    $wscript = Join-Path $env:WINDIR 'System32\wscript.exe'
+    $action = New-ScheduledTaskAction -Execute $wscript `
+        -Argument "`"$komorebiLauncher`"" -WorkingDirectory $repoRoot
+    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+    $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Highest
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
+        -MultipleInstances IgnoreNew
+    Register-ScheduledTask -TaskName 'komorebi (elevated)' -Action $action -Trigger $trigger `
+        -Principal $principal -Settings $settings -Force | Out-Null
+
+    Get-Process komorebi,komorebi-bar,whkd -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-ScheduledTask -TaskName 'komorebi (elevated)'
+    Write-Host 'Configured elevated Komorebi startup; current whkdrc bindings will be loaded.'
 }
-else {
-    Write-Warning "Workspacer installer not found: $workspacerInstaller"
-}
+
+Configure-KomorebiStartup
 
 Write-Host 'Dotfiles bootstrap completed.'
