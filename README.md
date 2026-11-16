@@ -12,12 +12,15 @@ Open **Administrator PowerShell** in this repository and run one command:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\install.ps1"
 ```
 
+![Demo of the bootstrapped Windows desktop](demo.png)
+Picture1.png
 The installer:
 
 - Sets `WORKSPACER_CONFIG` to this repository
 - Installs PowerShell 7
 - Installs komorebi and whkd for lightweight Rust-based tiling and Alt-key controls
-- Installs Artifex's MuPDF toolkit (`mutool`), VLC, 7-Zip, and Zen Browser
+- Installs Artifex's MuPDF toolkit (`mutool`), VLC, 7-Zip, Zen Browser, and ImageGlass
+- Removes the per-user Windows Photos packages and registers ImageGlass as the default viewer, with the WinUI3 Dark theme and Mica backdrop
 - Includes an optional Chris Titus Tech WinUtil Minimal debloat step; the current
   machine is marked as already debloated so rerunning setup does not repeat it
 - Configures WinUtil-style Security updates only: feature updates are deferred,
@@ -35,7 +38,7 @@ The installer:
 - Installs Microsoft Coreutils (`cat`, `grep`, `find`, `xargs`, and related Unix-style commands)
 - Installs `lf`, `ripgrep`, `fd`, `fzf`, `bat`, `jq`, Git, and GitHub CLI
 - Configures `lf` with a ranger-style dark theme, Nerd Font icons, previews, Windows file associations,
-  VLC media opening, and Neovim editing for text, Markdown, LaTeX, and source files
+  ImageGlass for images, VLC media opening, and Neovim editing for text, Markdown, LaTeX, and source files
 - Detects the repository's `nircmd` files
 - Configures komorebi's built-in bar with workspace numbers, layout, focused title,
   CPU, storage, memory, network, battery, date, and time widgets
@@ -88,6 +91,14 @@ result to the clipboard; the bootstrap republishes the image without
 Flameshot's clipboard-manager ignore marker so Ditto records it in history.
 Flameshot is started automatically at logon.
 
+ImageGlass is the lightweight image-viewer replacement. The bootstrap removes the
+per-user Microsoft Photos packages and registers ImageGlass as the default viewer
+through ImageGlass's own `--ig-set-default-viewer` command. It installs Mizan's
+[WinUI3 Dark](https://imageglass.org/themes/winui3-dark-mizan-53) theme pack,
+points both dark and light modes at that pack, and uses a Mica window backdrop so
+the viewer stays close to Windows 11 dark WinUI. `lf` opens common image formats
+in ImageGlass.
+
 Keypirinha is the lightweight Spotlight-style search replacement. Its explicit
 shortcut is `Ctrl+Alt+S`, and Vim AHK forwards `Win+S` to it. Its built-in
 Everything package uses the already-running Everything index for fast file and
@@ -116,11 +127,11 @@ link-state power savings. Answering anything else skips it. These settings allow
 deeper idle states but cannot force a particular C-state; CPU firmware, drivers, and
 active devices determine the final residency.
 
-WinGet installs VLC, 7-Zip, Zen Browser, and Artifex's MuPDF command-line toolkit
-(`mutool`). Windows protects the current user's default-app associations; therefore
-the installer does not overwrite them through unsupported registry hacks. Set VLC,
-Zen Browser, and your preferred PDF handler in **Settings → Apps → Default apps**
-after installation.
+WinGet installs VLC, 7-Zip, Zen Browser, ImageGlass, and Artifex's MuPDF command-line toolkit
+(`mutool`). ImageGlass is registered as the default photo viewer through its supported
+command-line helper. Windows still protects some associations; if a format stays bound
+to another app, set ImageGlass, VLC, Zen Browser, and your preferred PDF handler in
+**Settings → Apps → Default apps** after installation.
 
 ## Vim AHK
 
@@ -137,7 +148,7 @@ Use `vim-refresh -NoPull` to rebuild the existing checkout without pulling from 
 
 WinShotX is not installed or started by this setup. Flameshot handles
 `Win+Shift+S` region capture and copies the result to the clipboard. The
-installer removes old WinShotX and PowerToys remnants.
+installer removes old WinShotX remnants.
 
 ## Commit changes
 

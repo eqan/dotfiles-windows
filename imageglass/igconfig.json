@@ -1,0 +1,10 @@
+{
+  "_Metadata": {
+    "Description": "ImageGlass configuration file",
+    "Version": 10
+  },
+  "QuickSetupVersion": 10,
+  "DarkTheme": "WinUI3-Dark.Mizan",
+  "LightTheme": "WinUI3-Dark.Mizan",
+  "WindowBackdrop": "Mica"
+}

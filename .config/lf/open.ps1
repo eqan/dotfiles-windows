@@ -39,5 +39,32 @@ if ($extension -in @('.mp4', '.mkv', '.webm', '.avi', '.mov', '.wmv', '.mp3', '.
     exit 0
 }
 
-# Images, PDFs, archives and unknown files use their Windows file association.
+$imageExtensions = @(
+    '.bmp', '.gif', '.ico', '.jfif', '.jpe', '.jpeg', '.jpg', '.png', '.tif',
+    '.tiff', '.webp', '.avif', '.heic', '.heif', '.jxl', '.svg', '.svgz',
+    '.psd', '.tga', '.raw', '.dng', '.cr2', '.cr3', '.nef', '.arw', '.orf'
+)
+if ($imageExtensions -contains $extension) {
+    $imageGlass = $null
+    foreach ($candidate in @(
+            'C:\Program Files\ImageGlass\ImageGlass.exe',
+            (Join-Path $env:LOCALAPPDATA 'Programs\ImageGlass\ImageGlass.exe')
+        )) {
+        if (Test-Path -LiteralPath $candidate) {
+            $imageGlass = $candidate
+            break
+        }
+    }
+    if (!$imageGlass) {
+        $imageGlass = (Get-Command ImageGlass.exe -ErrorAction SilentlyContinue).Source
+    }
+    if ($imageGlass) {
+        Start-Process -FilePath $imageGlass -ArgumentList @($resolved)
+    } else {
+        Start-Process -FilePath $resolved
+    }
+    exit 0
+}
+
+# PDFs, archives and unknown files use their Windows file association.
 Start-Process -FilePath $resolved

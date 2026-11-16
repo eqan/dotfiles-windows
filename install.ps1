@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = $PSScriptRoot
+$automationRoot = Join-Path $env:LOCALAPPDATA 'Windows-Automation'
 
 if (!(Get-Command winget -ErrorAction SilentlyContinue)) {
     throw 'WinGet is unavailable. Install/update App Installer from Microsoft Store, then run this script again.'
@@ -94,7 +95,6 @@ function Remove-ReplacedApplications {
         }
     }
 
-    # Remove known PowerToys context-menu remnants if the package was previously removed.
     Get-AppxPackage | Where-Object {
         $_.Name -in @(
             'Microsoft.PowerToys.FileLocksmithContextMenu',
@@ -103,6 +103,27 @@ function Remove-ReplacedApplications {
         )
     } | ForEach-Object {
         Remove-AppxPackage -Package $_.PackageFullName -ErrorAction SilentlyContinue
+    }
+
+    Unregister-ScheduledTask -TaskName 'PowerToys (elevated)' -Confirm:$false -ErrorAction SilentlyContinue
+    $powerToysShortcut = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup') 'PowerToys.lnk'
+    if (Test-Path -LiteralPath $powerToysShortcut) {
+        Remove-Item -LiteralPath $powerToysShortcut -Force
+    }
+    foreach ($powerToysKey in @(
+        'HKCU:\Software\Microsoft\PowerToys',
+        'HKCU:\Software\Classes\AllFileSystemObjects\ShellEx\ContextMenuHandlers\PowerRenameExt',
+        'HKCU:\Software\Classes\Directory\Background\shellex\ContextMenuHandlers\PowerRenameExt'
+    )) {
+        Remove-Item -LiteralPath $powerToysKey -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    foreach ($powerToysDirectory in @(
+        (Join-Path $env:LOCALAPPDATA 'PowerToys'),
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys')
+    )) {
+        if (Test-Path -LiteralPath $powerToysDirectory) {
+            try { [IO.Directory]::Delete($powerToysDirectory, $true) } catch { Write-Warning "Could not remove ${powerToysDirectory}: $($_.Exception.Message)" }
+        }
     }
 }
 
@@ -276,6 +297,35 @@ function Remove-ReplacedWindowsScreenshotApp {
 
 Remove-ReplacedWindowsScreenshotApp
 
+function Remove-ReplacedWindowsPhotosApp {
+    $photoPackages = @(
+        'Microsoft.Windows.Photos',
+        'Microsoft.Photos.MediaEngineDLC',
+        'Microsoft.Windows.Photos.Automation'
+    )
+
+    $removedAny = $false
+    foreach ($packageName in $photoPackages) {
+        $packages = @(Get-AppxPackage -Name $packageName -ErrorAction SilentlyContinue)
+        foreach ($package in $packages) {
+            try {
+                Remove-AppxPackage -Package $package.PackageFullName -ErrorAction Stop
+                $removedAny = $true
+                Write-Host "Removed Windows Photos package $($package.Name)."
+            }
+            catch {
+                Write-Warning "Could not remove $($package.Name): $($_.Exception.Message)"
+            }
+        }
+    }
+
+    if (!$removedAny) {
+        Write-Host 'Native Windows Photos is already removed for this user.'
+    }
+}
+
+Remove-ReplacedWindowsPhotosApp
+
 function Remove-ReplacedWindowsTerminal {
     $windowsTerminal = Get-AppxPackage -Name Microsoft.WindowsTerminal -ErrorAction SilentlyContinue
     if ($windowsTerminal) {
@@ -300,6 +350,7 @@ $packages = @(
     'LGUG2Z.komorebi',
     'LGUG2Z.whkd',
     'Flameshot.Flameshot',
+    'DuongDieuPhap.ImageGlass',
     'ArtifexSoftware.mutool',
     'VideoLAN.VLC',
     '7zip.7zip',
@@ -383,7 +434,10 @@ function Install-KeypirinhaSystemActions {
     $source = Join-Path $repoRoot 'keypirinha\systemactions.py'
     if (!(Test-Path -LiteralPath $source)) { throw 'Keypirinha system-actions plugin source was not found.' }
     New-Item -ItemType Directory -Path $userPackages -Force | Out-Null
-    Compress-Archive -LiteralPath $source -DestinationPath (Join-Path $userPackages 'SystemActions.keypirinha-package') -Force
+    $packageZip = Join-Path $env:TEMP 'SystemActions.keypirinha-package.zip'
+    $packageDest = Join-Path $userPackages 'SystemActions.keypirinha-package'
+    Compress-Archive -LiteralPath $source -DestinationPath $packageZip -Force
+    Move-Item -LiteralPath $packageZip -Destination $packageDest -Force
     Write-Host 'Configured the native Keypirinha system-actions overlay.'
 }
 
@@ -492,30 +546,11 @@ else {
 
 # ---- lightweight screenshot capture ----
 $flameshotExe = 'C:\Program Files\Flameshot\bin\flameshot.exe'
-$clipboardBridgeSource = Join-Path $repoRoot 'tools\clipboard-image-bridge.ps1'
-$clipboardBridgeTarget = Join-Path $automationRoot 'tools\clipboard-image-bridge.ps1'
-if (Test-Path -LiteralPath $clipboardBridgeSource) {
-    New-Item -ItemType Directory -Path (Split-Path -Parent $clipboardBridgeTarget) -Force | Out-Null
-    Copy-Item -LiteralPath $clipboardBridgeSource -Destination $clipboardBridgeTarget -Force
-}
-$captureSource = Join-Path $repoRoot 'tools\flameshot-capture.ps1'
-$captureTarget = Join-Path $automationRoot 'tools\flameshot-capture.ps1'
-if (Test-Path -LiteralPath $captureSource) {
-    New-Item -ItemType Directory -Path (Split-Path -Parent $captureTarget) -Force | Out-Null
-    Copy-Item -LiteralPath $captureSource -Destination $captureTarget -Force
-}
 $captureTaskName = 'Flameshot capture (Ditto bridge)'
 Unregister-ScheduledTask -TaskName $captureTaskName -Confirm:$false -ErrorAction SilentlyContinue
-if (Test-Path -LiteralPath $captureTarget) {
-    $captureUserId = "$env:USERDOMAIN\$env:USERNAME"
-    $captureSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-        -StartWhenAvailable -MultipleInstances IgnoreNew
-    $captureAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument (
-        '-NoProfile -NonInteractive -ExecutionPolicy Bypass -STA -File "' + $captureTarget + '"')
-    $captureTrigger = New-ScheduledTaskTrigger -AtLogOn -User $captureUserId
-    $capturePrincipal = New-ScheduledTaskPrincipal -UserId $captureUserId -LogonType Interactive -RunLevel Limited
-    Register-ScheduledTask -TaskName $captureTaskName -Action $captureAction -Trigger $captureTrigger -Principal $capturePrincipal -Settings $captureSettings -Force | Out-Null
-}
+# The shortcut invokes the already-running Flameshot daemon directly. Do not
+# register a logon task here: it adds a hidden VBScript/PowerShell process and
+# can start an unwanted capture session during sign-in.
 if (Test-Path -LiteralPath $flameshotExe) {
     Get-Process flameshot -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     $startupRunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
@@ -528,6 +563,98 @@ if (Test-Path -LiteralPath $flameshotExe) {
 else {
     Write-Warning 'Flameshot was not found after installation; screenshot replacement was skipped.'
 }
+
+function Get-ImageGlassExecutable {
+    $candidates = @(
+        'C:\Program Files\ImageGlass\ImageGlass.exe',
+        (Join-Path $env:LOCALAPPDATA 'Programs\ImageGlass\ImageGlass.exe')
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate) {
+            return $candidate
+        }
+    }
+
+    $fromPath = (Get-Command ImageGlass.exe -ErrorAction SilentlyContinue).Source
+    if ($fromPath) {
+        return $fromPath
+    }
+
+    $appx = Get-AppxPackage -Name '*ImageGlass*' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($appx) {
+        $appxExe = Join-Path $appx.InstallLocation 'ImageGlass.exe'
+        if (Test-Path -LiteralPath $appxExe) {
+            return $appxExe
+        }
+    }
+
+    return $null
+}
+
+function Install-ImageGlassThemeAndConfig {
+    $configDir = Join-Path $env:LOCALAPPDATA 'ImageGlass'
+    $themesDir = Join-Path $configDir '_themes'
+    $themeFolderName = 'WinUI3-Dark.Mizan'
+    $themeDir = Join-Path $themesDir $themeFolderName
+    $themeUrl = 'https://github.com/mizanti/ImageGlass-WinUI3-Theme/releases/download/v1.1/WinUI3-Dark.Mizan.igtheme'
+    $configSource = Join-Path $repoRoot 'imageglass\igconfig.json'
+    $configTarget = Join-Path $configDir 'igconfig.json'
+
+    New-Item -ItemType Directory -Path $themesDir -Force | Out-Null
+
+    try {
+        $archive = Join-Path $env:TEMP 'WinUI3-Dark.Mizan.igtheme.zip'
+        Write-Host 'Installing ImageGlass WinUI3 Dark theme...'
+        Invoke-WebRequest -Uri $themeUrl -OutFile $archive
+        $staging = Join-Path $env:TEMP ('ig-theme-' + [guid]::NewGuid().ToString('N'))
+        Expand-Archive -LiteralPath $archive -DestinationPath $staging -Force
+        $themeJson = Get-ChildItem -LiteralPath $staging -Filter 'igtheme.json' -Recurse |
+            Select-Object -First 1
+        if (!$themeJson) {
+            throw 'The WinUI3 Dark theme archive did not contain igtheme.json.'
+        }
+
+        # ImageGlass 10 rejects v9 packs. Bump only the spec version so icons stay intact.
+        $themeJsonText = Get-Content -Raw -LiteralPath $themeJson.FullName
+        $themeJsonText = [regex]::Replace(
+            $themeJsonText,
+            '"Version"\s*:\s*"9\.0"',
+            '"Version": 10',
+            1
+        )
+        Set-Content -LiteralPath $themeJson.FullName -Value $themeJsonText -Encoding UTF8
+
+        if (Test-Path -LiteralPath $themeDir) {
+            Remove-Item -LiteralPath $themeDir -Recurse -Force
+        }
+        Copy-Item -LiteralPath $themeJson.Directory.FullName -Destination $themeDir -Recurse
+        Write-Host "Installed ImageGlass theme pack: $themeFolderName"
+    }
+    catch {
+        Write-Warning "Could not install the ImageGlass WinUI3 Dark theme: $($_.Exception.Message)"
+    }
+
+    if (Test-Path -LiteralPath $configSource) {
+        Copy-Item -LiteralPath $configSource -Destination $configTarget -Force
+        Write-Host "Configured ImageGlass with WinUI3 Dark and Mica: $configTarget"
+    }
+
+    $imageGlassExe = Get-ImageGlassExecutable
+    if ($imageGlassExe) {
+        & $imageGlassExe --ig-set-default-viewer --ig-no-quick-setup
+        if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+            Write-Warning "ImageGlass could not register as the default viewer (exit code $LASTEXITCODE)."
+        }
+        else {
+            Write-Host 'Registered ImageGlass as the default photo viewer.'
+        }
+    }
+    else {
+        Write-Warning 'ImageGlass was not found after installation; viewer configuration was skipped.'
+    }
+}
+
+Install-ImageGlassThemeAndConfig
 
 # ---- WezTerm configuration ----
 $weztermSource = Join-Path $repoRoot 'wezterm\wezterm.lua'
@@ -598,9 +725,13 @@ function Install-WindowsAutomationVim {
                 '  Run, "C:\Users\eqan\AppData\Local\Keypirinha\keypirinha.exe" --show,, Hide' + [Environment]::NewLine + 'Return' +
                 [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
         }
-        # Flameshot owns Win+Shift+S; do not register a competing AHK hotkey.
+        $flameshotBinding = '; Launch the already-running Flameshot daemon directly.' +
+            [Environment]::NewLine + '#+s::' + [Environment]::NewLine +
+            '  Run, "C:\Program Files\Flameshot\bin\flameshot.exe" gui --clipboard,, Hide' + [Environment]::NewLine +
+            'Return'
         $updatedCustomText = [regex]::Replace($updatedCustomText, '(?ms); Replace Windows Snipping Tool.*?^#\+s::\s*\r?\n.*?^Return\s*\r?\n\r?\n?', '')
         $updatedCustomText = [regex]::Replace($updatedCustomText, '(?ms)^#\+s::\s*\r?\n.*?^Return\s*\r?\n\r?\n?', '')
+        $updatedCustomText = $flameshotBinding + [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
         if ($updatedCustomText -notmatch '(?m)^\^!d::\s*$') {
             $desktopToggle = '; Toggle desktop icons: hidden by default, reveal temporarily when needed.' +
                 [Environment]::NewLine + '^!d::' + [Environment]::NewLine +
@@ -750,191 +881,29 @@ Return
 
 Install-WindowsAutomationVim
 
-# ---- (unchanged) PowerToys remaps ----
-function Configure-PowerToysRemaps {
-    $keyboardManagerPath = Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys\Keyboard Manager'
-    $profilePath = Join-Path $keyboardManagerPath 'default.json'
-    New-Item -ItemType Directory -Path $keyboardManagerPath -Force | Out-Null
-
-    try {
-        Get-Process PowerToys -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction Stop
-    }
-    catch {
-        Write-Warning 'Could not stop PowerToys; close it before rerunning setup if the remap does not activate.'
-    }
-
-    $settingsCli = Get-Command PowerToys.Settings.CLI.exe -ErrorAction SilentlyContinue
-    if (!$settingsCli) {
-        $settingsCli = Get-ChildItem 'C:\Program Files\PowerToys' -Filter 'PowerToys.Settings.CLI.exe' `
-            -File -ErrorAction SilentlyContinue | Select-Object -First 1
-    }
-    if ($settingsCli) {
-        $settingsCliPath = if ($settingsCli.Source) { $settingsCli.Source } else { $settingsCli.FullName }
-        & $settingsCliPath enable KeyboardManager
-        & $settingsCliPath enable PowerLauncher
-        Write-Host 'Enabled PowerToys Keyboard Manager and PowerToys Run.'
-    }
-    else {
-        Write-Warning 'PowerToys.Settings.CLI.exe was not found; utilities must be enabled manually.'
-    }
-
-    if (Test-Path -LiteralPath $profilePath) {
-        $profile = Get-Content -LiteralPath $profilePath -Raw | ConvertFrom-Json
-        Copy-Item -LiteralPath $profilePath -Destination "$profilePath.bak" -Force
-    }
-    else {
-        $profile = [pscustomobject]@{}
-    }
-
-    if (!$profile.PSObject.Properties['remapKeys']) {
-        $profile | Add-Member -NotePropertyName remapKeys -NotePropertyValue ([pscustomobject]@{})
-    }
-    if (!$profile.remapKeys.PSObject.Properties['global']) {
-        $profile.remapKeys | Add-Member -NotePropertyName global -NotePropertyValue @()
-    }
-    # Do not globally remap Left Win: it changes the meaning of Win in every application.
-    $profile.remapKeys.global = @($profile.remapKeys.global) |
-        Where-Object { $_ -and $_.originalKeys -notin @('91', '165') }
-
-    if (!$profile.PSObject.Properties['remapShortcuts']) {
-        $profile | Add-Member -NotePropertyName remapShortcuts -NotePropertyValue ([pscustomobject]@{})
-    }
-    if (!$profile.remapShortcuts.PSObject.Properties['global']) {
-        $profile.remapShortcuts | Add-Member -NotePropertyName global -NotePropertyValue @()
-    }
-
-    # Remove obsolete WinShotX and Win+S Keyboard Manager mappings. PowerToys
-    # Run has a native Win+S override which is more reliable than chaining two
-    # global keyboard hooks.
-    $globalRemaps = @($profile.remapShortcuts.global) |
-        Where-Object {
-            $_ -and
-            $_.originalKeys -notin @('91;160;83', '162;160;83', '91;83')
+function Install-FlameshotHelperScripts {
+    $helperScripts = @(
+        'tools\clipboard-image-bridge.ps1',
+        'tools\flameshot-capture.ps1',
+        'tools\run-flameshot-capture-hidden.vbs'
+    )
+    foreach ($relativePath in $helperScripts) {
+        $source = Join-Path $repoRoot $relativePath
+        if (!(Test-Path -LiteralPath $source)) {
+            continue
         }
-    # Keep this as an actual JSON array even when it contains one entry.
-    $profile.remapShortcuts.global = [object[]]$globalRemaps
-
-    $profile | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $profilePath -Encoding UTF8
-    Write-Host 'Preserved native Win behavior; removed conflicting global Win remaps'
-
-    $runSettingsPath = Join-Path $env:LOCALAPPDATA 'MicrosoftPowerToysPowerToys Runsettings.json'
-    if (Test-Path -LiteralPath $runSettingsPath) {
-        $runSettings = Get-Content -LiteralPath $runSettingsPath -Raw | ConvertFrom-Json
-        if (!$runSettings.properties.PSObject.Properties['open_powerlauncher']) {
-            $runSettings.properties | Add-Member -NotePropertyName open_powerlauncher -NotePropertyValue ([pscustomobject]@{})
-        }
-        $runSettings.properties.open_powerlauncher.win = $true
-        $runSettings.properties.open_powerlauncher.ctrl = $false
-        $runSettings.properties.open_powerlauncher.alt = $true
-        $runSettings.properties.open_powerlauncher.shift = $false
-        $runSettings.properties.open_powerlauncher.code = 83
-        $runSettings.properties.open_powerlauncher.key = ''
-        $runSettings.properties.hotkey_changed = $true
-        $runSettings.properties.override_win_s_key = $true
-        $runSettings | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $runSettingsPath -Encoding UTF8
-        Write-Host 'Configured PowerToys Run: Win+S override and Win+Alt+S hotkey'
-    }
-
-    $legacyRunSettingsPath = Join-Path $env:LOCALAPPDATA 'MicrosoftPowerToysPowerToys RunSettingsPowerToysRunSettings.json'
-    if (Test-Path -LiteralPath $legacyRunSettingsPath) {
-        $legacyRunSettings = Get-Content -LiteralPath $legacyRunSettingsPath -Raw | ConvertFrom-Json
-        $legacyRunSettings.Hotkey = 'Win + Alt + S'
-        $legacyRunSettings | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $legacyRunSettingsPath -Encoding UTF8
-    }
-
-    $powerToysExe = 'C:\Program Files\PowerToys\PowerToys.exe'
-    if (Test-Path -LiteralPath $powerToysExe) {
-        Start-Process -FilePath $powerToysExe
+        $target = Join-Path $automationRoot $relativePath
+        New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+        Copy-Item -LiteralPath $source -Destination $target -Force
     }
 }
 
-# PowerToys has been replaced by Keypirinha, Everything, Flameshot, komorebi,
-# and AutoHotkey. Keep this compatibility function as a no-op for older checkouts.
-function Configure-PowerToysRemaps {
-    Write-Host 'Skipping PowerToys configuration; the lightweight replacements are active.'
-}
-
-if ((winget list --id Microsoft.PowerToys --exact --source winget --accept-source-agreements 2>$null | Out-String) -match 'Microsoft\.PowerToys') {
-    Write-Host 'Removing Microsoft PowerToys; its active features are replaced by Everything, Flameshot, Workspacer, and AHK.'
-    & winget uninstall --id Microsoft.PowerToys --exact --source winget --silent --accept-source-agreements
-}
-
-# Remove PowerToys packaged context-menu extensions and per-user remnants too.
-$powerToysContextPackages = @(
-    'Microsoft.PowerToys.FileLocksmithContextMenu',
-    'Microsoft.PowerToys.ImageResizerContextMenu',
-    'Microsoft.PowerToys.PowerRenameContextMenu'
-)
-Get-AppxPackage | Where-Object { $_.Name -in $powerToysContextPackages } |
-    ForEach-Object { Remove-AppxPackage -Package $_.PackageFullName -ErrorAction SilentlyContinue }
-foreach ($powerToysKey in @(
-    'HKCU:\Software\Microsoft\PowerToys',
-    'HKCU:\Software\Classes\AllFileSystemObjects\ShellEx\ContextMenuHandlers\PowerRenameExt',
-    'HKCU:\Software\Classes\Directory\Background\shellex\ContextMenuHandlers\PowerRenameExt'
-)) {
-    Remove-Item -LiteralPath $powerToysKey -Recurse -Force -ErrorAction SilentlyContinue
-}
-foreach ($powerToysDirectory in @(
-    (Join-Path $env:LOCALAPPDATA 'PowerToys'),
-    (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys')
-)) {
-    if (Test-Path -LiteralPath $powerToysDirectory) {
-        try { [IO.Directory]::Delete($powerToysDirectory, $true) } catch { Write-Warning "Could not remove ${powerToysDirectory}: $($_.Exception.Message)" }
-    }
-}
-
-Configure-PowerToysRemaps
-
-# Remove the old elevated PowerToys startup task if it exists.
-Unregister-ScheduledTask -TaskName 'PowerToys (elevated)' -Confirm:$false -ErrorAction SilentlyContinue
+Install-FlameshotHelperScripts
 
 # ---- Workspacer startup is registered as an elevated scheduled task ----
 $workspacerStartupShortcut = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup') 'workspacer-dotfiles.lnk'
 if (Test-Path -LiteralPath $workspacerStartupShortcut) {
     Remove-Item -LiteralPath $workspacerStartupShortcut -Force
-}
-
-# ---- PowerToys elevated startup task ----
-$powerToysStartupTarget = @(
-    'C:\Program Files\PowerToys\PowerToys.exe',
-    (Join-Path $env:LOCALAPPDATA 'PowerToys\PowerToys.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-$powerToysStartupArguments = ''
-if (!$powerToysStartupTarget) {
-    $powerToysCommand = Get-Command PowerToys.exe -ErrorAction SilentlyContinue
-    if ($powerToysCommand) {
-        $powerToysStartupTarget = $powerToysCommand.Source
-    }
-    else {
-        $powerToysPackage = Get-AppxPackage -Name Microsoft.PowerToys -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($powerToysPackage) {
-            $packagedExe = Get-ChildItem -LiteralPath $powerToysPackage.InstallLocation -Recurse -Filter 'PowerToys.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($packagedExe) {
-                $powerToysStartupTarget = $packagedExe.FullName
-            }
-            else {
-                $powerToysStartupTarget = Join-Path $env:WINDIR 'explorer.exe'
-                $powerToysStartupArguments = "shell:AppsFolder\$($powerToysPackage.PackageFamilyName)!PowerToys"
-            }
-        }
-    }
-}
-
-$powerToysShortcut = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup') 'PowerToys.lnk'
-if (Test-Path -LiteralPath $powerToysShortcut) { Remove-Item -LiteralPath $powerToysShortcut -Force }
-if (Test-Path -LiteralPath $powerToysStartupTarget) {
-    $powerToysTaskName = 'PowerToys (elevated)'
-    $userId = "$env:USERDOMAIN\$env:USERNAME"
-    $taskAction = New-ScheduledTaskAction -Execute $powerToysStartupTarget -Argument $powerToysStartupArguments -WorkingDirectory (Split-Path -Parent $powerToysStartupTarget)
-    $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
-    $taskPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Highest
-    $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-    Register-ScheduledTask -TaskName $powerToysTaskName -Action $taskAction -Trigger $taskTrigger -Principal $taskPrincipal -Settings $taskSettings -Force | Out-Null
-    if (!(Get-Process PowerToys -ErrorAction SilentlyContinue)) { Start-ScheduledTask -TaskName $powerToysTaskName }
-    Write-Host 'Configured elevated startup: PowerToys'
-}
-else {
-    Write-Warning 'PowerToys executable/package was not found; startup task was not created.'
 }
 
 $everythingShortcut = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup') 'Everything.lnk'
@@ -975,6 +944,10 @@ function Configure-BackgroundUtilities {
         Set-ItemProperty -Path $dittoRegistry -Name DittoHotKey -Type DWord -Value 1608
         Set-ItemProperty -Path $dittoRegistry -Name DittoHotKey2 -Type DWord -Value 0
         Set-ItemProperty -Path $dittoRegistry -Name DittoHotKey3 -Type DWord -Value 0
+        # Let Ditto accept Flameshot's valid bitmap even when its private
+        # Clipboard Viewer Ignore marker is also present. This removes the
+        # per-capture Task Scheduler/VBScript/PowerShell bridge.
+        Set-ItemProperty -Path $dittoRegistry -Name EnforceClipboardIgnoreFormats -Type DWord -Value 0
         $action = New-ScheduledTaskAction -Execute $dittoExe -WorkingDirectory (Split-Path -Parent $dittoExe)
         $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
         $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Limited
