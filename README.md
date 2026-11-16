@@ -30,9 +30,12 @@ The installer:
 - Installs WezTerm, a Rust terminal emulator with tabs and panes, configured to launch
   PowerShell 7 by default
 - Installs native Unix-oriented tools: eza, zoxide, and Yazi, alongside Microsoft Coreutils
+- Installs Ditto for clipboard history and starts Ditto in the background at logon
 - Installs JetBrainsMono Nerd Font for prompt icons and configures Windows Terminal to use it
 - Installs Microsoft Coreutils (`cat`, `grep`, `find`, `xargs`, and related Unix-style commands)
 - Installs `lf`, `ripgrep`, `fd`, `fzf`, `bat`, `jq`, Git, and GitHub CLI
+- Configures `lf` with a ranger-style dark theme, Nerd Font icons, previews, Windows file associations,
+  VLC media opening, and Neovim editing for text, Markdown, LaTeX, and source files
 - Detects the repository's `nircmd` files
 - Configures komorebi's built-in bar with workspace numbers, layout, focused title,
   CPU, storage, memory, network, battery, date, and time widgets
@@ -47,6 +50,7 @@ The installer:
 - Removes replaced applications such as Workspacer, YASB, PowerToys, Flow Launcher,
   Brave, and WinShotX when they are still installed
 - Starts komorebi, its built-in bar, whkd, and Vim AHK with the committed configuration
+- Starts Everything with `-startup` and Ditto as hidden background tray utilities; neither opens a window at logon
 
 ## Manual start
 
@@ -80,7 +84,9 @@ the bootstrap also removes the per-user Windows Terminal package when present.
 Flameshot supports region,
 window, fullscreen, clipboard, annotation, blur, and export workflows without
 the larger ShareX suite. `Win+Shift+S` starts region capture and copies the
-result to the clipboard; Flameshot is started automatically at logon.
+result to the clipboard; the bootstrap republishes the image without
+Flameshot's clipboard-manager ignore marker so Ditto records it in history.
+Flameshot is started automatically at logon.
 
 Keypirinha is the lightweight Spotlight-style search replacement. Its explicit
 shortcut is `Ctrl+Alt+S`, and Vim AHK forwards `Win+S` to it. Its built-in

@@ -1,0 +1,44 @@
+# Windows lf configuration: fast, ranger-like, and Neovim-friendly.
+set shell pwsh
+set shellflag "-cwa"
+set shellopts "-nop"
+set hidden false
+set icons true
+set drawbox true
+set reverse true
+set ignorecase true
+set smartcase true
+set incsearch true
+set scrolloff 5
+set tabstop 4
+set ratios 1:2:3
+set info size:time
+set preview true
+set previewer "$Env:APPDATA\lf\preview.cmd"
+
+# Open directories in lf; suspend lf while Neovim owns this terminal, and
+# return to lf when Neovim exits. Other applications are launched detached.
+cmd open $pwsh -NoProfile -File "$Env:APPDATA\lf\open.ps1" "$Env:f"
+
+# Ranger-like editing and viewing keys.
+map e $$nvim "$Env:f"
+map i !&bat --paging=always "$Env:f"
+map l open
+map <right> open
+map zh set hidden!
+map _ set hidden!
+map \_ set hidden!
+map zf set reverse!
+map zr reload
+map yy copy
+map dd cut
+map pp paste
+map D delete
+map r rename
+
+# Useful navigation shortcuts.
+map gh cd ~
+map gd cd ~/Desktop
+map gc cd ~/.config
+map gv cd ~/Videos
+map gp cd ~/Pictures

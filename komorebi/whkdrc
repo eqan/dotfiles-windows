@@ -1,7 +1,7 @@
-.shell pwsh
+.shell cmd
 
 # Reload and shortcut overlay
-alt + o                 : taskkill /f /im whkd.exe; Start-Process whkd -WindowStyle hidden
+alt + o                 : taskkill /f /im whkd.exe && start "" /b whkd.exe
 alt + shift + o         : komorebic reload-configuration
 alt + i                 : komorebic toggle-shortcuts
 
@@ -39,7 +39,7 @@ alt + y                 : komorebic flip-layout vertical
 alt + t                 : komorebic toggle-float
 alt + shift + f         : komorebic toggle-monocle
 alt + shift + r         : komorebic retile
-alt + p                 : komorebic toggle-pause
+alt + shift + p         : komorebic toggle-pause
 alt + q                 : komorebic close
 alt + c                 : komorebic close
 alt + m                 : komorebic minimize

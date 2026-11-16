@@ -179,7 +179,6 @@ function Apply-LightweightWindowsDebloat {
     # rather than permanently disabling the service.
     $optionalServices = @(
         'WSearch',          # Everything/Flow replaces Windows Search indexing
-        'cbdhsvc*',         # Ditto replaces Windows Clipboard User Service
         'Spooler',          # Enable manually when printing is needed
         'LanmanServer',     # Enable manually when sharing files/printers
         'TrkWks',           # Legacy distributed-link tracking
@@ -241,6 +240,25 @@ function Apply-LightweightWindowsDebloat {
     }
 }
 
+function Repair-ClipboardUserService {
+    # Ditto complements the Windows clipboard; it does not replace the
+    # clipboard service. The per-user instances are trigger-started by
+    # Windows, so do not try to start them directly (that is denied even from
+    # some elevated sessions). Repair only the service template if a previous
+    # debloat pass disabled it.
+    $clipboardTemplate = 'HKLM:\SYSTEM\CurrentControlSet\Services\cbdhsvc'
+    $template = Get-ItemProperty -LiteralPath $clipboardTemplate -ErrorAction SilentlyContinue
+    if ($template -and $template.Start -eq 4) {
+        Set-ItemProperty -LiteralPath $clipboardTemplate -Name Start -Type DWord -Value 3
+        Write-Host 'Restored the Windows Clipboard User Service template to Manual.'
+    }
+    else {
+        Write-Host 'Windows Clipboard User Service remains available (trigger-started/manual).'
+    }
+}
+
+Repair-ClipboardUserService
+
 Apply-LightweightWindowsDebloat
 
 function Remove-ReplacedWindowsScreenshotApp {
@@ -278,6 +296,7 @@ $packages = @(
     'Microsoft.PowerShell',
     'Neovim.Neovim',
     'voidtools.Everything',
+    'Ditto.Ditto',
     'LGUG2Z.komorebi',
     'LGUG2Z.whkd',
     'Flameshot.Flameshot',
@@ -359,6 +378,17 @@ function Install-Keypirinha {
 
 Install-Keypirinha
 
+function Install-KeypirinhaSystemActions {
+    $userPackages = Join-Path $env:LOCALAPPDATA 'Keypirinha\portable\Profile\InstalledPackages'
+    $source = Join-Path $repoRoot 'keypirinha\systemactions.py'
+    if (!(Test-Path -LiteralPath $source)) { throw 'Keypirinha system-actions plugin source was not found.' }
+    New-Item -ItemType Directory -Path $userPackages -Force | Out-Null
+    Compress-Archive -LiteralPath $source -DestinationPath (Join-Path $userPackages 'SystemActions.keypirinha-package') -Force
+    Write-Host 'Configured the native Keypirinha system-actions overlay.'
+}
+
+Install-KeypirinhaSystemActions
+
 # komorebi's native bar replaces YASB; remove an older YASB installation if present.
 if ((winget list --id AmN.yasb --exact --source winget --accept-source-agreements 2>$null | Out-String) -match 'AmN\.yasb') {
     Write-Host 'Removing redundant YASB; komorebi-bar provides the status bar with fewer components.'
@@ -382,6 +412,19 @@ function Install-KomorebiConfiguration {
     Copy-Item -LiteralPath (Join-Path $komorebiSource 'komorebi.json') -Destination $komorebiTarget -Force
     Copy-Item -LiteralPath (Join-Path $komorebiSource 'komorebi.bar.json') -Destination $barTarget -Force
     Copy-Item -LiteralPath (Join-Path $komorebiSource 'whkdrc') -Destination $whkdTarget -Force
+    if (Test-Path -LiteralPath $applicationsTarget) {
+        $applications = Get-Content -Raw -LiteralPath $applicationsTarget | ConvertFrom-Json
+        $vimAkhRule = [pscustomobject]@{
+            ignore = @([pscustomobject]@{
+                kind = 'Exe'
+                id = 'vim_ahk.exe'
+                matching_strategy = 'Equals'
+            })
+        }
+        $applications | Add-Member -MemberType NoteProperty -Name 'Vim AHK system menu' `
+            -Value $vimAkhRule -Force
+        $applications | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $applicationsTarget -Encoding UTF8
+    }
     Write-Host "Configured komorebi, built-in bar, and whkd under $env:USERPROFILE."
 }
 
@@ -449,6 +492,30 @@ else {
 
 # ---- lightweight screenshot capture ----
 $flameshotExe = 'C:\Program Files\Flameshot\bin\flameshot.exe'
+$clipboardBridgeSource = Join-Path $repoRoot 'tools\clipboard-image-bridge.ps1'
+$clipboardBridgeTarget = Join-Path $automationRoot 'tools\clipboard-image-bridge.ps1'
+if (Test-Path -LiteralPath $clipboardBridgeSource) {
+    New-Item -ItemType Directory -Path (Split-Path -Parent $clipboardBridgeTarget) -Force | Out-Null
+    Copy-Item -LiteralPath $clipboardBridgeSource -Destination $clipboardBridgeTarget -Force
+}
+$captureSource = Join-Path $repoRoot 'tools\flameshot-capture.ps1'
+$captureTarget = Join-Path $automationRoot 'tools\flameshot-capture.ps1'
+if (Test-Path -LiteralPath $captureSource) {
+    New-Item -ItemType Directory -Path (Split-Path -Parent $captureTarget) -Force | Out-Null
+    Copy-Item -LiteralPath $captureSource -Destination $captureTarget -Force
+}
+$captureTaskName = 'Flameshot capture (Ditto bridge)'
+Unregister-ScheduledTask -TaskName $captureTaskName -Confirm:$false -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $captureTarget) {
+    $captureUserId = "$env:USERDOMAIN\$env:USERNAME"
+    $captureSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable -MultipleInstances IgnoreNew
+    $captureAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument (
+        '-NoProfile -NonInteractive -ExecutionPolicy Bypass -STA -File "' + $captureTarget + '"')
+    $captureTrigger = New-ScheduledTaskTrigger -AtLogOn -User $captureUserId
+    $capturePrincipal = New-ScheduledTaskPrincipal -UserId $captureUserId -LogonType Interactive -RunLevel Limited
+    Register-ScheduledTask -TaskName $captureTaskName -Action $captureAction -Trigger $captureTrigger -Principal $capturePrincipal -Settings $captureSettings -Force | Out-Null
+}
 if (Test-Path -LiteralPath $flameshotExe) {
     Get-Process flameshot -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     $startupRunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
@@ -531,12 +598,9 @@ function Install-WindowsAutomationVim {
                 '  Run, "C:\Users\eqan\AppData\Local\Keypirinha\keypirinha.exe" --show,, Hide' + [Environment]::NewLine + 'Return' +
                 [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
         }
-        if ($updatedCustomText -notmatch '(?m)^#\+s::\s*$') {
-            $updatedCustomText = '; Replace Windows Snipping Tool with Flameshot region capture to clipboard.' +
-                [Environment]::NewLine + '#+s::' + [Environment]::NewLine +
-                '  Run, "C:\Program Files\Flameshot\bin\flameshot.exe" gui --clipboard,, Hide' + [Environment]::NewLine + 'Return' +
-                [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
-        }
+        # Flameshot owns Win+Shift+S; do not register a competing AHK hotkey.
+        $updatedCustomText = [regex]::Replace($updatedCustomText, '(?ms); Replace Windows Snipping Tool.*?^#\+s::\s*\r?\n.*?^Return\s*\r?\n\r?\n?', '')
+        $updatedCustomText = [regex]::Replace($updatedCustomText, '(?ms)^#\+s::\s*\r?\n.*?^Return\s*\r?\n\r?\n?', '')
         if ($updatedCustomText -notmatch '(?m)^\^!d::\s*$') {
             $desktopToggle = '; Toggle desktop icons: hidden by default, reveal temporarily when needed.' +
                 [Environment]::NewLine + '^!d::' + [Environment]::NewLine +
@@ -556,6 +620,31 @@ function Install-WindowsAutomationVim {
         if ($updatedCustomText -notmatch '(?m)^#MenuMaskKey\s+') {
             # vkFF is documented as "no mapping" and avoids vk07, which newer Windows versions reserve.
             $updatedCustomText = '#MenuMaskKey vkFF' + [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
+        }
+        if ($updatedCustomText -notmatch '(?m)^; Keypirinha system power palette$') {
+            $systemMenu = @'
+; Keypirinha system power palette (Alt+P; search namespace: power:)
+!p::
+  Run, "C:\Users\eqan\AppData\Local\Keypirinha\keypirinha.exe" --show,, Hide
+  Sleep, 80
+  SendInput, ^a{Backspace}power:
+Return
+
+'@
+            $updatedCustomText = $systemMenu + $updatedCustomText
+        }
+        $dittoBinding = '; Open Ditto clipboard history through its supported single-instance command.' +
+            [Environment]::NewLine + '^+h::' + [Environment]::NewLine +
+            '  Run, "C:\Program Files\Ditto\Ditto.exe" -open,, Hide' + [Environment]::NewLine +
+            'Return'
+        if ($updatedCustomText -match '(?ms); Open Ditto clipboard history.*?^\^\+h::\s*\r?\n.*?^Return\s*$') {
+            $updatedCustomText = [regex]::Replace($updatedCustomText, '(?ms); Open Ditto clipboard history.*?^\^\+h::\s*\r?\n.*?^Return\s*$', $dittoBinding, 1)
+        }
+        elseif ($updatedCustomText -match '(?m)^\^\+h::\s*$') {
+            $updatedCustomText = [regex]::Replace($updatedCustomText, '(?ms)^\^\+h::\s*\r?\n.*?^Return\s*$', $dittoBinding, 1)
+        }
+        else {
+            $updatedCustomText = $dittoBinding + [Environment]::NewLine + [Environment]::NewLine + $updatedCustomText
         }
         $updatedCustomText = $updatedCustomText -replace '(?ms); Close the Start/menu overlay for a standalone Win press without intercepting Win\+key combinations\.?\r?\n~LWin Up::.*?Return\r?\n\r?\n~RWin Up::.*?Return\r?\n\r?\n', ''
         $updatedCustomText = $updatedCustomText -replace '(?ms); Function to Call the live draw\r?\n#o::\r?\n\s*Run,"C:\\Program Files\\workspacer\\workspacer\.exe"\r?\nreturn', '; Start komorebi and its built-in bar without opening a console window.' + [Environment]::NewLine + '#o::' + [Environment]::NewLine + '  Run, "C:\\Program Files\\komorebi\\bin\\komorebic.exe" start --whkd --bar,, Hide' + [Environment]::NewLine + 'return'
@@ -854,6 +943,58 @@ if (Test-Path -LiteralPath $everythingShortcut) {
     Write-Host 'Removed stale Everything startup shortcut'
 }
 
+function Configure-BackgroundUtilities {
+    $startupDirectory = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'
+    $everythingExe = 'C:\Program Files\Everything\Everything.exe'
+    $dittoExe = 'C:\Program Files\Ditto\Ditto.exe'
+    $userId = "$env:USERDOMAIN\$env:USERNAME"
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable -MultipleInstances IgnoreNew
+
+    foreach ($taskName in @('Everything (background)', 'Ditto (background)')) {
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    }
+
+    if (Test-Path -LiteralPath $everythingExe) {
+        $action = New-ScheduledTaskAction -Execute $everythingExe -Argument '-startup' `
+            -WorkingDirectory (Split-Path -Parent $everythingExe)
+        $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+        $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Limited
+        Register-ScheduledTask -TaskName 'Everything (background)' -Action $action -Trigger $trigger `
+            -Principal $principal -Settings $settings -Force | Out-Null
+        Get-Process Everything -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-ScheduledTask -TaskName 'Everything (background)'
+        Write-Host 'Configured Everything to start in the background with -startup.'
+    }
+
+    if (Test-Path -LiteralPath $dittoExe) {
+        # Ditto stores hotkeys as LOWORD=virtual key and HIWORD=HOTKEYF flags.
+        # H (0x48) + Ctrl (0x02) + Shift (0x04) => 0x0648 = 1608.
+        $dittoRegistry = 'HKCU:\Software\Ditto'
+        New-Item -Path $dittoRegistry -Force | Out-Null
+        Set-ItemProperty -Path $dittoRegistry -Name DittoHotKey -Type DWord -Value 1608
+        Set-ItemProperty -Path $dittoRegistry -Name DittoHotKey2 -Type DWord -Value 0
+        Set-ItemProperty -Path $dittoRegistry -Name DittoHotKey3 -Type DWord -Value 0
+        $action = New-ScheduledTaskAction -Execute $dittoExe -WorkingDirectory (Split-Path -Parent $dittoExe)
+        $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+        $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Limited
+        Register-ScheduledTask -TaskName 'Ditto (background)' -Action $action -Trigger $trigger `
+            -Principal $principal -Settings $settings -Force | Out-Null
+        # Ask Ditto to exit cleanly so it clears its saved main HWND. A forced
+        # kill leaves a stale HWND behind and makes the next -open request a no-op.
+        Start-Process -FilePath $dittoExe -ArgumentList '-exit' -WindowStyle Hidden -ErrorAction SilentlyContinue
+        $dittoDeadline = (Get-Date).AddSeconds(3)
+        while ((Get-Process Ditto -ErrorAction SilentlyContinue) -and (Get-Date) -lt $dittoDeadline) {
+            Start-Sleep -Milliseconds 100
+        }
+        Get-Process Ditto -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-ScheduledTask -TaskName 'Ditto (background)'
+        Write-Host 'Configured Ditto to start in the background.'
+    }
+}
+
+Configure-BackgroundUtilities
+
 $staleWinShotXShortcut = Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup') 'WinShotX.lnk'
 if (Test-Path -LiteralPath $staleWinShotXShortcut) {
     Remove-Item -LiteralPath $staleWinShotXShortcut -Force
@@ -922,6 +1063,18 @@ if ($profileSource) {
 }
 else {
     Write-Warning 'No Microsoft.PowerShell_profile.ps1 was found in the repository.'
+}
+
+# ---- lf file manager configuration ----
+$lfSource = Join-Path $repoRoot '.config\lf'
+if (Test-Path -LiteralPath $lfSource) {
+    $lfTarget = Join-Path $env:APPDATA 'lf'
+    New-Item -ItemType Directory -Path $lfTarget -Force | Out-Null
+    Copy-Item -Path (Join-Path $lfSource '*') -Destination $lfTarget -Recurse -Force
+    Write-Host "Installed ranger-style lf configuration: $lfTarget"
+}
+else {
+    Write-Warning 'No lf configuration directory was found in the repository.'
 }
 
 # ---- (unchanged) Neovim config ----

@@ -72,7 +72,9 @@ function global:touch {
 }
 
 if (Test-Path -LiteralPath 'C:\Program Files\Neovim\bin\nvim.exe') { Set-Alias nvim 'C:\Program Files\Neovim\bin\nvim.exe' -Scope Global }
-if (Test-Path -LiteralPath 'C:\Users\eqan\go\bin\lf.exe') { Set-Alias lf 'C:\Users\eqan\go\bin\lf.exe' -Scope Global }
+$lfPath = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links\lf.exe'
+if (!(Test-Path -LiteralPath $lfPath)) { $lfPath = 'C:\Users\eqan\go\bin\lf.exe' }
+if (Test-Path -LiteralPath $lfPath) { Set-Alias lf $lfPath -Scope Global }
 if (Get-Command go.exe -ErrorAction SilentlyContinue) { Set-Alias go (Get-Command go.exe).Source -Scope Global }
 
 function global:rprofile { . $PROFILE }

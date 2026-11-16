@@ -25,4 +25,5 @@ $bar = Get-Process komorebi-bar -ErrorAction SilentlyContinue
 if (!$komorebi -or !$whkd -or !$bar) {
     throw 'Komorebi recovery failed: the manager, whkd, or bar did not start.'
 }
+
 Write-Host 'Komorebi, whkd, and komorebi-bar recovered successfully.'
