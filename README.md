@@ -5,9 +5,6 @@ the default Microsoft apps and heavier suites. The installer prefers native bina
 and portable tools: a Rust tiling window manager, a Rust terminal, a Vim layer, and
 focused replacements for search, screenshots, photos, and media.
 
-It is not a Workspacer, PowerToys, or Flow Launcher setup. Those programs, along with
-YASB, Brave, WinShotX, Windows Terminal, Photos, and Snipping Tool, are removed when
-present.
 
 ![Demo of the bootstrapped Windows desktop](demo.png)
 
